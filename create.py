@@ -161,34 +161,3 @@ def create_DC_network_with_converter(xl_file, path_cable_catalogue):
         net.converter.loc[len(net.converter)] = new_row
     
     return net, cable_catalogue
-
-
-
-#En devellopement 
-def create_DC_network_with_transformer(xl_file, path_cable_catalogue):
-    """
-    Creates a DC network with converters from the provided Excel file and cable catalogue.
-
-    Parameters:
-    xl_file (pd.ExcelFile): The Excel file containing network data.
-    path_cable_catalogue (str): The path to the cable catalogue file.
-
-    Returns:
-    net (pandapowerNet): The created pandapower network with converters.
-    cable_catalogue (pd.DataFrame): The processed cable catalogue.
-    """
-    # Create the base DC network and get the buses dictionary
-    net, cable_catalogue, buses = create_DC_network(xl_file, path_cable_catalogue, return_buses=True)
-    
-    # Parse the converter data from the Excel file
-    converter_data = xl_file.parse('converter')
-
-    # Initialize the converter DataFrame in the network    
-    # Add each converter to the network
-    for _, row in converter_data.iterrows():
-        pp.create_transformer_from_parameters(net, hv_bus=buses[row['to_bus']], lv_bus=buses[row['from_bus']], sn_mva=1e8,
-                                      vn_hv_kv=row['hv']/1000, vn_lv_kv=row['lv']/1000, vk_percent=1e-4,
-                                      vkr_percent=0.0, pfe_kw=0, i0_percent=0.0,
-                                      shift_degree=0, name="Transformer")
-    
-    return net, cable_catalogue
