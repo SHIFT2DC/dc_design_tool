@@ -70,7 +70,7 @@ def plot_network_with_plotly(net):
     fig = pplotly.simple_plotly(net_plot)
     line_trace=pplotly.create_line_trace(net_plot,cmap="jet",cmap_vals=net_plot.res_line.loading_percent,width=4.0,
                                          infofunc=(Series(index=net.line.index,
-                                                          data=[s1 + s2 for s1, s2 in zip(net.res_line.i_ka.astype(str), net.res_line.loading_percent.apply(lambda x : f'<br> loading  : {x:.1f} % <br>').values)]
+                                                          data=[f'I : {row.i_ka*1000:.1f} A <br>loading : {row.loading_percent:.1f} % <br> cable_rank : {net.line.loc[i,"cable_rank"]}' for i,row in net.res_line.iterrows()]
                                                           )))
     bus_trace=pplotly.create_bus_trace(net_plot,cmap="jet_r",cmap_vals=net_plot.res_bus.vm_pu, size=10,
                                        infofunc=(Series(index=net.bus.index,

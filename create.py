@@ -4,7 +4,7 @@ from ast import literal_eval
 import numpy as np
 import openpyxl
 from read_cable_catalogue import read_cable_catalogue, process_cable_catalogue
-from reading_utilities import find_cable_info,read_UC_Definition
+from reading_utilities import read_UC_Definition
 from topology_utilities import separate_subnetworks,sorting_network,merge_networks
 
 
@@ -64,6 +64,11 @@ def create_DC_network(path, path_cable_catalogue, return_buses=False):
             pp.create_sgen(net,
                            bus=bus,
                            p_mw=row['Maximum power (kW)'] / 1000)  # Active power in MW
+        elif row['Component type'].replace(' ','').lower()=='EV'.replace(' ','').lower():    
+            pp.create_load(net,
+                           bus=bus,
+                           p_mw=row['Maximum power (kW)'] / 1000,  # Convert kW to MW
+                           q_mvar=0)
         if (not np.isnan(row['Node number for directly linked converter'])) and (row['Node number for directly linked converter'] not in list(net.bus.index)):
             bus = pp.create_bus(net,index=row['Node number for directly linked converter'], 
                                 vn_kv=0, 
@@ -164,4 +169,4 @@ def create_DC_network(path, path_cable_catalogue, return_buses=False):
         net.converter.loc[len(net.converter)] = new_row
     
     
-    return net, cable_catalogue
+    return net, cable_catalogue,Uc
