@@ -2,7 +2,7 @@ import pandas as pd
 import pandapower as pp
 from create import create_DC_network
 from plot_utilities import plot_network_with_plotly   
-from loadflow_utilities import New_LF,LF_sizing
+from loadflow_utilities import LF_DC,LF_sizing
 
 path='grid_data_input_file_WIP_v1.xlsx'
 path_cable_catalogue="cable_catalogue.xlsx"

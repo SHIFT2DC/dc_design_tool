@@ -146,10 +146,10 @@ def LF_sizing(net,cable_catalogue,use_case):
                                     tmp_net.line.max_i_ka.loc[l] = new_cable['Imax'] / 1000
                                     tmp_net.line.cable_rank.loc[l] = cable_rank_beetween+1
 
-                                    new_cable = cable_catalogue.loc[len(cable_catalogue)-1]
+                                    new_cable = cable_catalogue.loc[cable_rank_beetween+1]
                                     tmp_net.line.r_ohm_per_km.loc[i] = new_cable['R'] * 1000
                                     tmp_net.line.max_i_ka.loc[i] = new_cable['Imax'] / 1000
-                                    tmp_net.line.cable_rank.loc[i] = len(cable_catalogue)-1
+                                    tmp_net.line.cable_rank.loc[i] = cable_rank_beetween+1
                                     optimal=False
                             pp.runpp(tmp_net)
 
