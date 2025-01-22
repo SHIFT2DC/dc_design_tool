@@ -2,110 +2,72 @@ import pandapower as pp
 import numpy as np
 import pandas as pd
 import copy
+from topology_utilities import separate_subnetworks,sorting_network,merge_networks
+import math as m
 
-def ldf_DC(net):
-    """
-    Runs a load flow (power flow) analysis on the given DC network.
+def clean_network(net,original_net):
 
-    Parameters:
-    net (pandapowerNet): The pandapower network object.
+    net.converter=original_net.converter
+    net.res_converter=original_net.res_converter
+    # net.res_converter=pd.DataFrame(columns=["p_mw","loading (%)"])
+    # for i, row in net.converter.iterrows():
+    #     b=row.from_bus
+    #     l=net.load.loc[net.load.bus==b]
+    #     if len(l)>0:
+    #         net.res_converter.loc[len(net.res_converter)]={"p_mw":l.p_mw.values[0],"loading (%)":l.p_mw.values[0]/row.P*100}
+    #     else:
+    #         net.res_converter.loc[len(net.res_converter)]={"p_mw":None,"loading (%)":None}
 
-    Returns:
-    pandapowerNet: The network object after running the load flow analysis.
-    """
-    try:
-        pp.runpp(net)
-    except pp.LoadflowNotConverged:
-        print("Power Flow did not converge")
+
+    del_load=['Load of net' in str(x) for x in net.load.name.values]
+    net.load.drop(net.load.loc[del_load].index,inplace=True)
+    net.res_load.drop(net.res_load.loc[del_load].index,inplace=True)
+
+    del_ext_grid=['Converter emulation' in str(x) for x in net.ext_grid.name.values]
+    net.ext_grid.drop(net.ext_grid.loc[del_ext_grid].index,inplace=True)
+    net.res_ext_grid.drop(net.res_ext_grid.loc[del_ext_grid].index,inplace=True)
     
     return net
 
-def preprocess_ldf_DC(net):
-    """
-    Preprocesses the DC network for load flow analysis by handling converters and their efficiencies.
+def New_LF(net):
+    subnetwork_list = separate_subnetworks(net)
+    dic_of_subs=sorting_network(net, subnetwork_list)
+    #print(dic_of_subs)
+    loadflowed_sub=[]
+    net.res_converter=pd.DataFrame(data=np.empty((len(net.converter),3)),columns=["p_mw","loading (%)",'pl_mw'])
+    while not all(elem in loadflowed_sub for elem in dic_of_subs.keys()):
+        for n in list(set(list(dic_of_subs.keys()))-set(loadflowed_sub)):
+            if all(elem in loadflowed_sub for elem in [x[0] for x in dic_of_subs[n]['direct_downstream_network']]):
+                tmp_net=dic_of_subs[n]['network']
+                for c in dic_of_subs[n]['direct_upstream_network']:
+                    b=[x[1] for x in dic_of_subs[c[0]]['direct_downstream_network'] if x[0]==n][0]
+                    pp.create_ext_grid(tmp_net,bus=b,vm_pu=1.0,name='Converter emulation')
+                # print(tmp_net)
+                # print('>> Loadflow of network '+ str(n))
+                pp.runpp(tmp_net)
+                dic_of_subs[n]['network']=tmp_net
+                loadflowed_sub.append(n)
+                for c in dic_of_subs[n]['direct_upstream_network']:
+                    up_net=dic_of_subs[c[0]]['network']
+                    p=tmp_net.res_ext_grid.p_mw.values[0]
+                    converter=net.converter.loc[net.converter.name==c[2]]
+                    eff = np.interp(abs(p), converter.efficiency.values[0][:, 0] / 1000, converter.efficiency.values[0][:, 1])
+                    pp.create_load(up_net,
+                            bus=c[1],
+                            p_mw=p*eff*int(p<0)+p/eff*int(p>0),  # Convert kW to MW
+                            q_mvar=0,name='Load of net '+ str(n))
+                    dic_of_subs[c[0]]['network']=up_net
+                    net.res_converter.loc[net.converter.name==c[2],'p_mw']=p*eff*int(p<0)+p/eff*int(p>0)
+                    net.res_converter.loc[net.converter.name==c[2],'loading (%)']=p/net.converter.loc[net.converter.name==c[2],'P']*100
+                    net.res_converter.loc[net.converter.name==c[2],'pl_mw']=p-(p*eff*int(p<0)+p/eff*int(p>0))
 
-    Parameters:
-    net (pandapowerNet): The pandapower network object.
+    net_res=merge_networks([dic_of_subs[n]['network'] for n in dic_of_subs.keys()])
+    net=clean_network(net_res,net)
+    return net
 
-    Returns:
-    tuple: The original network and a new network with updated elements.
-    """
-    for idx_converter, converter in net.converter.iterrows():
-        # Identify the element connected to the 'from_bus' of the converter
-        if (net.load.bus.values == converter.from_bus).any():
-            elm = net.load[net.load.bus.values == converter.from_bus]
-        elif (net.storage.bus.values == converter.from_bus).any():
-            elm = net.storage[net.storage.bus.values == converter.from_bus]
-        elif (net.sgen.bus.values == converter.from_bus).any():
-            elm = net.sgen[net.sgen.bus.values == converter.from_bus]
-        else:
-            raise ValueError("Converter unconnected")
 
-        # Calculate efficiency of the converter
-        eff = np.interp(elm.p_mw, converter.efficiency[:, 0] / 1000, converter.efficiency[:, 1])[0]
-        loss = 1 - eff
 
-        # Update the power values of loads,storage and generator based on the efficiency of the converter
-        if (net.load.bus.values == converter.to_bus).any():
-            net.load.loc[net.load.bus.values == converter.to_bus, 'p_mw'] = elm.p_mw.values[0] * (1 + loss)
-        elif (net.storage.bus.values == converter.to_bus).any():
-            if elm.p_mw.values[0] > 0:
-                net.storage.loc[net.storage.bus.values == converter.to_bus, 'p_mw'] = elm.p_mw.values[0] * (1 - loss)
-            else:
-                net.storage.loc[net.storage.bus.values == converter.to_bus, 'p_mw'] = elm.p_mw.values[0] * (1 + loss)
-        elif (net.sgen.bus.values == converter.to_bus).any():
-            net.sgen.loc[net.sgen.bus.values == converter.to_bus, 'p_mw'] = elm.p_mw.values[0] * (1 - loss)
-
-    # Create a deep copy of the network for further processing
-    new_net = copy.deepcopy(net)
-
-    # Lists to keep track of elements to be deleted
-    del_load = []
-    del_node = []
-    del_storage = []
-    del_sgen = []
-
-    # Identify loads, storage, and generators connected to converters for deletion
-    for idx_load, load in net.load.iterrows():
-        if load.bus in net.converter.from_bus.values:
-            del_load.append(idx_load)
-            del_node.append(load.bus)
-
-    for idx_storage, storage in net.storage.iterrows():
-        if storage.bus in net.converter.from_bus.values:
-            del_storage.append(idx_storage)
-            del_node.append(storage.bus)
-
-    for idx_sgen, sgen in net.sgen.iterrows():
-        if sgen.bus in net.converter.from_bus.values:
-            del_sgen.append(idx_sgen)
-            del_node.append(sgen.bus)
-
-    # Delete identified elements from the new network
-    new_net.load.drop(del_load, inplace=True)
-    new_net.storage.drop(del_storage, inplace=True)
-    new_net.sgen.drop(del_sgen, inplace=True)
-    new_net.bus.drop(del_node, inplace=True)
-
-    return net, new_net
-
-def ldf_DC_converter(net):
-    """
-    Runs a load flow analysis on a DC network with converters.
-
-    Parameters:
-    net (pandapowerNet): The pandapower network object.
-
-    Returns:
-    pandapowerNet: The network object after running the load flow analysis.
-    """
-    net, new_net = preprocess_ldf_DC(net)
-    new_net = ldf_DC(new_net)
-    return new_net
-
-import math as m
-
-def optimisation_cable_size(net, cable_catalogue):
+def new_optimisation_cable_size(net, cable_catalogue):
     """
     Optimizes the cable sizes in the DC network based on load flow results.
 
@@ -116,7 +78,8 @@ def optimisation_cable_size(net, cable_catalogue):
     Returns:
     pandapowerNet: The network object with optimized cable sizes.
     """
-    net = ldf_DC(net)
+    print(net)
+    net = New_LF(net)
     former_cable_ranks = [0] * net.line.cable_rank.values
     load_flow_converge = True
 
@@ -130,13 +93,14 @@ def optimisation_cable_size(net, cable_catalogue):
                 idx_new_cable = m.floor((idx_new_cable + net.line.cable_rank.loc[i]) / 2)
             else:
                 idx_new_cable = m.ceil((idx_new_cable + net.line.cable_rank.loc[i]) / 2)
-            print(idx_new_cable)
+            #print(idx_new_cable)
             new_cable = cable_catalogue.loc[idx_new_cable]
             net.line.r_ohm_per_km.loc[i] = new_cable['R'] * 1000
             net.line.max_i_ka.loc[i] = new_cable['Imax'] / 1000
             net.line.cable_rank.loc[i] = idx_new_cable
-        net = ldf_DC(net)
-        if np.isnan(net.res_line.i_ka.loc[0]):
+        try :
+            net = New_LF(net)
+        except :
             load_flow_converge = False
             break
 
@@ -147,6 +111,6 @@ def optimisation_cable_size(net, cable_catalogue):
             net.line.r_ohm_per_km.loc[i] = new_cable['R'] * 1000
             net.line.max_i_ka.loc[i] = new_cable['Imax'] / 1000
             net.line.cable_rank.loc[i] = former_cable_ranks[i]
-        net = ldf_DC(net)
+        net = New_LF(net)
     
     return net

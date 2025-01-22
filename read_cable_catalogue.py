@@ -30,10 +30,19 @@ def process_cable_catalogue(catalogue, cable_info):
     pd.DataFrame: The processed cable catalogue.
     """
     # Extract temperature, material, and isolation type from cable_info
-    T = cable_info['Temperature'].values[0]
-    mat = cable_info['Material'].values[0]
-    isolation = cable_info['Isolation'].values[0]
+    T = cable_info['Operating temperature (degrees Celsius)']
+    mat = cable_info['Material ']
+    isolation = cable_info['Isolation ']
+    if 'Cu' in mat:
+        mat='Cu'
+    elif 'Al' in mat:
+        mat='Al'
 
+    if 'PVC' in isolation:
+        isolation='PVC'
+    elif 'XLPE' in isolation:
+        isolation='XLPE'
+        
     # Filter the catalogue based on material and isolation type
     catalogue = catalogue.loc[catalogue['materiaux'].str.lower() == mat.lower()]
     catalogue = catalogue.loc[catalogue['isolation'].str.lower() == isolation.lower()]
