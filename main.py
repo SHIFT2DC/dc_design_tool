@@ -10,7 +10,7 @@ path_converter_catalogue = "Converters_Library.xlsx"
 
 net, cable_catalogue, uc = create_DC_network(path, path_cable_catalogue, path_converter_catalogue)
 
-#net=LF_DC(net)
+net=LF_DC(net)
 
 net = LF_sizing(net, cable_catalogue, uc)
 
@@ -20,7 +20,7 @@ plot_network_with_plotly(net)
 
 # TODO sizing coef sécu
 #stand by loss conv
-# read droop curve
+# read droop curve ->OK
 # worst case
 # warning tension haute
 # not cable sizing et conv
