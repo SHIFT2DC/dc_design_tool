@@ -72,8 +72,8 @@ def LF_DC(net):
 
 def LF_sizing(net,cable_catalogue,use_case):
     if use_case['Project details']['Ecosystem']=='ODCA':
-        min_v=0.92
-        max_v=1.08
+        min_v=0.98
+        max_v=1.02
     elif use_case['Project details']['Ecosystem']=='CurrentOS':
         min_v=0.98
         max_v=1.02 
@@ -155,7 +155,7 @@ def LF_sizing(net,cable_catalogue,use_case):
                             load_flow_converge=True
                             lines_beetween=find_lines_between_given_line_and_ext_grid(tmp_net,i)
                             while ((tmp_net.res_line.loc[i,"loading_percent"]<100) 
-                                    and (tmp_net.res_line.loc[i,tension_of_interest]<max_v)
+                                    #and (tmp_net.res_line.loc[i,tension_of_interest]<max_v)
                                     and (tmp_net.res_line.loc[i,tension_of_interest]>min_v)
                                     and (idx_new_cable>=1)
                                     and (load_flow_converge)):
@@ -168,10 +168,11 @@ def LF_sizing(net,cable_catalogue,use_case):
                                 try :
                                     pp.runpp(tmp_net)
                                 except :
+                                    print("PROBLEME LOADFLOW")
                                     load_flow_converge = False
 
                             if not ((tmp_net.res_line.loc[i,"loading_percent"]<100) 
-                                    and (tmp_net.res_line.loc[i,tension_of_interest]<max_v)
+                                    #and (tmp_net.res_line.loc[i,tension_of_interest]<max_v)
                                     and (tmp_net.res_line.loc[i,tension_of_interest]>min_v)
                                     and (load_flow_converge)):
                                 new_cable = cable_catalogue.loc[idx_cable]
@@ -193,7 +194,7 @@ def LF_sizing(net,cable_catalogue,use_case):
                                     new_cable = cable_catalogue.loc[cable_rank_beetween+1]
                                     tmp_net.line.r_ohm_per_km.loc[i] = new_cable['R'] * 1000
                                     tmp_net.line.max_i_ka.loc[i] = new_cable['Imax'] / 1000
-                                    tmp_net.line.cable_rank.loc[i] = cable_rank_beetween+1
+                                    tmp_net.line.cable_rank.loc[i] = len(cable_catalogue)-1
                                     optimal=False
                             pp.runpp(tmp_net)
 
