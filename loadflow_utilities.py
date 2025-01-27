@@ -4,6 +4,7 @@ import pandas as pd
 import copy
 from topology_utilities import separate_subnetworks,sorting_network,merge_networks,find_lines_between_given_line_and_ext_grid
 import math as m
+from ast import literal_eval
 
 def clean_network(net,original_net):
 
@@ -42,11 +43,11 @@ def LF_DC(net):
                 for c in dic_of_subs[n]['direct_upstream_network']:
                     b=[x[1] for x in dic_of_subs[c[0]]['direct_downstream_network'] if x[0]==n][0]
                     pp.create_ext_grid(tmp_net,bus=b,vm_pu=1.0,name='Converter emulation')
-                print(tmp_net.line)
-                print('>> Loadflow of network '+ str(n))
+                # print(tmp_net.line)
+                # print('>> Loadflow of network '+ str(n))
                 pp.runpp(tmp_net)
-                print(tmp_net.res_line)
-                print("*************************************")
+                # print(tmp_net.res_line)
+                # print("*************************************")
                 dic_of_subs[n]['network']=tmp_net
                 loadflowed_sub.append(n)
                 for c in dic_of_subs[n]['direct_upstream_network']:
@@ -79,6 +80,49 @@ def LF_sizing(net,cable_catalogue,use_case):
     else :
         min_v=0.95
         max_v=1.05
+
+
+    net=LF_DC(net)
+    for i in net.converter.index:
+        if net.converter.loc[i,'conv_rank'] is not None:
+            tmp_cc=net.converter.loc[i,'converter_catalogue']
+
+            if (tmp_cc['Nominal power (kW)']>(net.res_converter.loc[i,'p_mw']*1000)).values.any():
+                filtered_tmp_cc = tmp_cc[tmp_cc['Nominal power (kW)'] > abs(net.res_converter.loc[i,'p_mw']*1000)]
+                new_c = filtered_tmp_cc.loc[filtered_tmp_cc['Nominal power (kW)'].idxmin()]
+
+                if net.converter.loc[i,'efficiency'] == 'user-defined':
+                    eff=net.converter.loc[i,'efficiency'] 
+                    p_previous = eff[:, 0]*100/net.converter.loc[i,'P']
+                    p = p_previous/100*new_c['Nominal power (kW)']
+                    efficiency = np.vstack((p, e)).T
+                else :
+                    eff_str=new_c['Efficiency curve [Xi;Yi], i={1,2,3,4}, \nwith X= Factor of Nominal Power (%), Y=Efficiency (%)']
+                    eff=np.array(literal_eval('['+eff_str.replace(';',',')+']'))
+                    e = eff[:, 1].astype('float')/100
+                    p = eff[:, 0]/100*new_c['Nominal power (kW)']
+                    efficiency = np.vstack((p, e)).T
+                net.converter.loc[i,'conv_rank']=filtered_tmp_cc['Nominal power (kW)'].idxmin()
+                print(efficiency)
+                net.converter.at[i, 'efficiency']=efficiency
+                net.converter.loc[i, 'P']=new_c['Nominal power (kW)']/1000
+            else :
+                new_c = tmp_cc.loc[tmp_cc['Nominal power (kW)'].idxmax()]
+                if net.converter.loc[i,'efficiency'] == 'user-defined':
+                    eff=net.converter.loc[i,'efficiency'] 
+                    p_previous = eff[:, 0]*100/net.converter.loc[i,'P']
+                    p = p_previous/100*new_c['Nominal power (kW)']
+                    efficiency = np.vstack((p, e)).T
+                else :
+                    eff_str=new_c['Efficiency curve [Xi;Yi], i={1,2,3,4}, \nwith X= Factor of Nominal Power (%), Y=Efficiency (%)']
+                    eff=np.array(literal_eval('['+eff_str.replace(';',',')+']'))
+                    e = eff[:, 1].astype('float')/100
+                    p = eff[:, 0]/100*new_c['Nominal power (kW)']
+                    efficiency = np.vstack((p, e)).T
+                net.converter.loc[i,'conv_rank']=filtered_tmp_cc['Nominal power (kW)'].idxmin()
+                net.converter.at[i, 'efficiency']=efficiency
+                net.converter.loc[i, 'P']=new_c['Nominal power (kW)']/1000
+
 
     subnetwork_list = separate_subnetworks(net)
     dic_of_subs=sorting_network(net, subnetwork_list)
