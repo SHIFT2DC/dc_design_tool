@@ -3,10 +3,22 @@ import pandapower.topology as top
 import networkx as nx
 
 def separate_subnetworks(net):
-    # Find all the connected subnetworks
-    subnetworks = top.connected_components(top.create_nxgraph(net,include_trafos=False))
+    """
+    Separates the network into connected subnetworks.
+
+    Args:
+        net (pandapowerNet): The pandapower network to be separated.
+
+    Returns:
+        list: A list of pandapower subnetworks.
+    """
+    # Create a NetworkX graph from the pandapower network
+    graph = top.create_nxgraph(net, include_trafos=False)
     
-    # Create a list to store the individual subnetworks
+    # Find all connected subnetworks
+    subnetworks = top.connected_components(graph)
+    
+    # Create a list to store individual subnetworks
     subnetwork_list = []
     
     # Iterate over each subnetwork and create a new network for each
@@ -16,39 +28,74 @@ def separate_subnetworks(net):
     
     return subnetwork_list
 
+def sorting_network(net, subnetworks):
+    """
+    Sorts the subnetworks based on their direct connections.
 
-def sorting_network(net, subneworks):
-    dic_of_subs={}
-    for n in range(len(subneworks)):
-        subn=subneworks[n]
+    Args:
+        net (pandapowerNet): The original pandapower network.
+        subnetworks (list): List of subnetworks to be sorted.
+
+    Returns:
+        dict: A dictionary containing information about upstream and downstream connections.
+    """
+    dic_of_subs = {}
+    
+    # Iterate over each subnetwork
+    for n in range(len(subnetworks)):
+        subn = subnetworks[n]
         
-        dic_of_subs[n]={'network':subn,'direct_connect_network':[]}
+        # Initialize the dictionary for this subnetwork
+        dic_of_subs[n] = {'network': subn, 'direct_connect_network': []}
+        
+        # Check direct connections via converters
         for b in subn.bus.index:
             if b in net.converter.from_bus.values:
-                for i,bus_to_find in enumerate(net.converter.loc[net.converter.from_bus==b].to_bus.values):
-                    for idx_tmp_sub in range(len(subneworks)):
-                        tmp_sub=subneworks[idx_tmp_sub]
+                for i, bus_to_find in enumerate(net.converter.loc[net.converter.from_bus == b].to_bus.values):
+                    for idx_tmp_sub in range(len(subnetworks)):
+                        tmp_sub = subnetworks[idx_tmp_sub]
                         if bus_to_find in tmp_sub.bus.index:
-                            dic_of_subs[n]['direct_connect_network'].append([idx_tmp_sub,bus_to_find,net.converter.loc[net.converter.from_bus==b].name.values[i]])
+                            dic_of_subs[n]['direct_connect_network'].append([idx_tmp_sub, bus_to_find, net.converter.loc[net.converter.from_bus == b].name.values[i]])
+            
             if b in net.converter.to_bus.values:
-                for i,bus_to_find in enumerate(net.converter.loc[net.converter.to_bus==b].from_bus.values):
-                    for idx_tmp_sub in range(len(subneworks)):
-                        tmp_sub=subneworks[idx_tmp_sub]
+                for i, bus_to_find in enumerate(net.converter.loc[net.converter.to_bus == b].from_bus.values):
+                    for idx_tmp_sub in range(len(subnetworks)):
+                        tmp_sub = subnetworks[idx_tmp_sub]
                         if bus_to_find in tmp_sub.bus.index:
-                            dic_of_subs[n]['direct_connect_network'].append([idx_tmp_sub,bus_to_find,net.converter.loc[net.converter.to_bus==b].name.values[i]])
+                            dic_of_subs[n]['direct_connect_network'].append([idx_tmp_sub, bus_to_find, net.converter.loc[net.converter.to_bus == b].name.values[i]])
     
-    network_dict=find_upndownstream_networks(dic_of_subs)
+    # Find upstream and downstream networks
+    network_dict = find_upndownstream_networks(dic_of_subs)
 
     return network_dict
 
 def find_upndownstream_networks(network_dict):
+    """
+    Determines the upstream and downstream networks for each subnetwork.
+
+    Args:
+        network_dict (dict): Dictionary containing information about direct connections.
+
+    Returns:
+        dict: Updated dictionary with upstream and downstream networks.
+    """
     def is_upstream(network_id, visited):
-        # Si le réseau a une ext_grid, c'est un réseau amont
-        if len(network_dict[network_id]['network'].ext_grid)!=0:
+        """
+        Checks if a network is upstream.
+
+        Args:
+            network_id (int): The ID of the network.
+            visited (set): Set of already visited networks.
+
+        Returns:
+            bool: True if the network is upstream, False otherwise.
+        """
+        # If the network has an ext_grid, it is an upstream network
+        if len(network_dict[network_id]['network'].ext_grid) != 0:
             return True
-        # Marquer le réseau actuel comme visité
+        # Mark the current network as visited
         visited.add(network_id)
-        # Vérifier récursivement les réseaux connectés
+        # Recursively check connected networks
         for connection in network_dict[network_id]['direct_connect_network']:
             connected_network = connection[0]
             if connected_network not in visited:
@@ -56,6 +103,7 @@ def find_upndownstream_networks(network_dict):
                     return True
         return False
 
+    # Iterate over each network to determine upstream and downstream connections
     for network_id, network_data in network_dict.items():
         direct_connect_network = network_data['direct_connect_network']
         direct_upstream_network = []
@@ -71,42 +119,69 @@ def find_upndownstream_networks(network_dict):
         network_data['direct_upstream_network'] = direct_upstream_network
         network_data['direct_downstream_network'] = direct_downstream_network
     
+    # Remove the 'direct_connect_network' key as it is no longer needed
     for network_id, network_data in network_dict.items():
         del network_data['direct_connect_network']
+    
     return network_dict
 
 def merge_networks(nets):
-    # Créer un réseau vide pour contenir le réseau fusionné
+    """
+    Merges multiple pandapower networks into a single network.
+
+    Args:
+        nets (list): List of pandapower networks to be merged.
+
+    Returns:
+        pandapowerNet: The merged network.
+    """
+    # Create an empty network to contain the merged network
     merged_net = pp.create_empty_network()
+    
+    # Merge each network into the empty network
     for net in nets:
-        merged_net=pp.merge_nets(merged_net, net, validate=False, std_prio_on_net1=True)
+        merged_net = pp.merge_nets(merged_net, net, validate=False, std_prio_on_net1=True)
+    
     return merged_net
 
-
-
 def find_lines_between_given_line_and_ext_grid(net, line_id):
-    # Créer un graphe NetworkX à partir du réseau pandapower
+    """
+    Finds the lines between a given line and the external grid.
+
+    Args:
+        net (pandapowerNet): The pandapower network.
+        line_id (int): The ID of the given line.
+
+    Returns:
+        list: List of indices of the lines between the given line and the external grid.
+    """
+    # Create a NetworkX graph from the pandapower network
     G = pp.topology.create_nxgraph(net)
 
-    # Trouver le nœud connecté à la grille externe
+    # Find the node connected to the external grid
     ext_grid_node = net.ext_grid.bus.values[0]
 
-    # Trouver les nœuds connectés à la ligne donnée
+    # Find the nodes connected to the given line
     line = net.line.loc[line_id]
     from_node = line['from_bus']
     to_node = line['to_bus']
 
-    # Trouver tous les chemins des nœuds de la ligne au nœud de la grille externe
+    # Find all paths from the line nodes to the external grid node
     paths_from = nx.shortest_path(G, source=from_node, target=ext_grid_node)
     paths_to = nx.shortest_path(G, source=to_node, target=ext_grid_node)
 
-    if len(paths_from) >len(paths_to):
-        short_path=paths_to
+    # Choose the shortest path
+    if len(paths_from) > len(paths_to):
+        short_path = paths_to
     else:
-        short_path=paths_from
+        short_path = paths_from
 
-    lines = [[short_path[i],short_path[i+1]] for i in range(len(short_path)-1)]
-    lines_index=[]
-    for line in lines : 
-        lines_index.append(net.line.loc[((net.line.from_bus==line[1]) & (net.line.to_bus==line[0])) | ((net.line.from_bus==line[0]) & (net.line.to_bus==line[1]))].index[0])
+    # Extract the lines from the shortest path
+    lines = [[short_path[i], short_path[i+1]] for i in range(len(short_path)-1)]
+    lines_index = []
+    
+    # Find the indices of the corresponding lines
+    for line in lines:
+        lines_index.append(net.line.loc[((net.line.from_bus == line[1]) & (net.line.to_bus == line[0])) | ((net.line.from_bus == line[0]) & (net.line.to_bus == line[1]))].index[0])
+    
     return lines_index
