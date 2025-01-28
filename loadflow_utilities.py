@@ -77,7 +77,7 @@ def calculate_converter_power(power: float, converter: pd.Series) -> tuple:
 
     # Calculate adjusted power based on flow direction
     adjusted_power = power * efficiency if power < 0 else power / efficiency
-
+    adjusted_power = adjusted_power + converter['stand_by_loss'].iloc[0]
     # Calculate power loss
     power_loss = power - adjusted_power
 
@@ -291,15 +291,15 @@ def perform_load_flow_with_sizing(net: pp.pandapowerNet, cable_catalogue: pd.Dat
     """
     # Step 1: Define voltage limits based on the use case
     min_v, max_v = define_voltage_limits(use_case)
-
+    cable_factor, AC_DC_factor, converter_factor = define_sizing_security_factor(use_case)
     # Step 2: Perform initial DC load flow analysis
     net = perform_dc_load_flow(net)
 
     # Step 3: Adjust converter sizing based on load flow results
-    adjust_converter_sizing(net)
+    adjust_converter_sizing(net, AC_DC_factor, converter_factor)
 
     # Step 4: Process subnetworks and perform cable adjustments
-    net = process_subnetworks_with_cable_sizing(net, cable_catalogue, min_v, max_v)
+    net = process_subnetworks_with_cable_sizing(net, cable_catalogue, min_v, max_v,cable_factor)
 
     return net
 
@@ -318,9 +318,26 @@ def define_voltage_limits(use_case: Dict) -> tuple:
         return 0.98, 1.02
     else:
         return 0.95, 1.05
+    
+
+def define_sizing_security_factor(use_case: Dict) -> tuple:
+    """
+    Defines the sizing security factot based on the use case.
+
+    Args:
+        use_case (Dict): Dictionary specifying project details and constraints.
+
+    Returns:
+        tuple: A tuple containing the minimum and maximum voltage limits.
+    """
+    cable_factor = use_case['Conductor parameters']['Cable sizing security factor (%)']
+    AC_DC_factor = use_case['Converter details']['AC/DC converter sizing security factor (%)']
+    converter_factor = use_case['Converter details']['Other converters sizing security factor (%)']
+    return cable_factor, AC_DC_factor, converter_factor
+        
 
 
-def process_subnetworks_with_cable_sizing(net: pp.pandapowerNet, cable_catalogue: pd.DataFrame, min_v: float, max_v: float) -> pp.pandapowerNet:
+def process_subnetworks_with_cable_sizing(net: pp.pandapowerNet, cable_catalogue: pd.DataFrame, min_v: float, max_v: float, cable_factor: int) -> pp.pandapowerNet:
     """
     Processes all subnetworks and adjusts cable sizing based on load flow results.
 
@@ -341,13 +358,13 @@ def process_subnetworks_with_cable_sizing(net: pp.pandapowerNet, cable_catalogue
     while not all(sub in loadflowed_subs for sub in dic_of_subs.keys()):
         for n in set(dic_of_subs.keys()) - set(loadflowed_subs):
             if all_downstream_processed(dic_of_subs, n, loadflowed_subs):
-                process_single_subnetwork_with_cable_sizing(dic_of_subs, n, cable_catalogue, min_v, max_v, loadflowed_subs, net)
+                process_single_subnetwork_with_cable_sizing(dic_of_subs, n, cable_catalogue, min_v, max_v, loadflowed_subs, net, cable_factor)
     
     net_res = merge_networks([dic_of_subs[n]['network'] for n in dic_of_subs.keys()])
     return clean_network(net_res, net)
     
 
-def process_single_subnetwork_with_cable_sizing(dic_of_subs: Dict, n: int, cable_catalogue: pd.DataFrame, min_v: float, max_v: float, loadflowed_subs: List[int], net: pp.pandapowerNet) -> None:
+def process_single_subnetwork_with_cable_sizing(dic_of_subs: Dict, n: int, cable_catalogue: pd.DataFrame, min_v: float, max_v: float, loadflowed_subs: List[int], net: pp.pandapowerNet, cable_factor: int) -> None:
     """
     Processes a single subnetwork and adjusts cable sizing.
 
@@ -367,7 +384,7 @@ def process_single_subnetwork_with_cable_sizing(dic_of_subs: Dict, n: int, cable
 
     # Run power flow and adjust cable sizing
     pp.runpp(tmp_net)
-    adjust_cable_sizing(tmp_net, cable_catalogue, min_v, max_v)
+    adjust_cable_sizing(tmp_net, cable_catalogue, min_v, max_v, cable_factor)
     # Update the subnetwork in the dictionary
     dic_of_subs[n]['network'] = tmp_net
     loadflowed_subs.append(n)
@@ -417,7 +434,7 @@ def update_upstream_networks_with_results(dic_of_subs: Dict, n: int, tmp_net: pp
         update_converter_results(net, upstream[2], adjusted_power, power, power - adjusted_power)
 
 
-def adjust_converter_sizing(net: pp.pandapowerNet) -> None:
+def adjust_converter_sizing(net: pp.pandapowerNet, AC_DC_factor: int, converter_factor: int) -> None:
     """
     Adjusts the sizing of converters based on the load flow results.
 
@@ -427,12 +444,12 @@ def adjust_converter_sizing(net: pp.pandapowerNet) -> None:
     for i in net.converter.index:
         if net.converter.loc[i, 'conv_rank'] is not None:
             tmp_cc = net.converter.loc[i, 'converter_catalogue']
-            new_c,new_conv_rank = select_converter_based_on_power(tmp_cc, net.res_converter.loc[i, 'p_mw'])
+            new_c,new_conv_rank = select_converter_based_on_power(tmp_cc, net.res_converter.loc[i, 'p_mw'],AC_DC_factor, converter_factor)
             update_converter_efficiency_curve(net, i, new_c)
             update_converter_attributes(net, i, new_c, int(new_conv_rank))
 
 
-def select_converter_based_on_power(tmp_cc: pd.DataFrame, power_mw: float) -> tuple:
+def select_converter_based_on_power(tmp_cc: pd.DataFrame, power_mw: float, AC_DC_factor: int, converter_factor: int) -> tuple:
     """
     Selects the appropriate converter based on the power requirements.
 
@@ -443,9 +460,13 @@ def select_converter_based_on_power(tmp_cc: pd.DataFrame, power_mw: float) -> tu
     Returns:
         pd.Series: The selected converter.
     """
+    if 'AC/DC' in tmp_cc.loc[0,'Converter type']:
+        factor = AC_DC_factor
+    else :
+        factor = converter_factor
     if (tmp_cc['Nominal power (kW)'] > (power_mw * 1000)).values.any():
         # Find new converter with minimum capacity above required power
-        filtered_tmp_cc = tmp_cc[tmp_cc['Nominal power (kW)'] > abs(power_mw * 1000)]
+        filtered_tmp_cc = tmp_cc[tmp_cc['Nominal power (kW)']*(1-factor/100) > abs(power_mw * 1000)]
         return filtered_tmp_cc.loc[filtered_tmp_cc['Nominal power (kW)'].idxmin()],filtered_tmp_cc['Nominal power (kW)'].idxmin()
     else:
         # Otherwise, select the largest converter
@@ -488,7 +509,7 @@ def update_converter_attributes(net: pp.pandapowerNet, i: int, new_c: pd.Series,
     net.converter.loc[i, 'conv_rank'] = new_conv_rank
     net.converter.loc[i, 'P'] = new_c['Nominal power (kW)'] / 1000
 
-def adjust_cable_sizing(subnet: pp.pandapowerNet, cable_catalogue: pd.DataFrame, min_v: float, max_v: float) -> None:
+def adjust_cable_sizing(subnet: pp.pandapowerNet, cable_catalogue: pd.DataFrame, min_v: float, max_v: float, cable_factor: int) -> None:
     """
     Adjusts the sizing of cables based on the load flow results.
 
@@ -499,12 +520,13 @@ def adjust_cable_sizing(subnet: pp.pandapowerNet, cable_catalogue: pd.DataFrame,
         max_v (float): Maximum voltage limit.
     """
     for line_id in subnet.res_line.i_ka.sort_values(ascending=False).index:
-        optimal = False
-        while not optimal:
-            optimal = adjust_single_cable(subnet, line_id, cable_catalogue, min_v)
+        if not np.isnan(subnet.line.loc[line_id,'cable_rank']):
+            optimal = False
+            while not optimal:
+                optimal = adjust_single_cable(subnet, line_id, cable_catalogue, min_v, cable_factor)
 
 
-def adjust_single_cable(subnet: pp.pandapowerNet, line_id: int, cable_catalogue: pd.DataFrame, min_v: float) -> bool:
+def adjust_single_cable(subnet: pp.pandapowerNet, line_id: int, cable_catalogue: pd.DataFrame, min_v: float, cable_factor: int) -> bool:
     """
     Adjusts the sizing of a single cable.
 
@@ -522,7 +544,7 @@ def adjust_single_cable(subnet: pp.pandapowerNet, line_id: int, cable_catalogue:
     idx_cable = idx_new_cable
     load_flow_converge = True
     # Perform iterative cable resizing
-    while (subnet.res_line.loc[line_id, "loading_percent"] < 100 and
+    while (subnet.res_line.loc[line_id, "loading_percent"] < (100 * (1-cable_factor/100)) and
            subnet.res_line.loc[line_id, tension_of_interest] > min_v and
            idx_new_cable >= 1 and load_flow_converge):
         idx_cable = idx_new_cable
@@ -537,7 +559,7 @@ def adjust_single_cable(subnet: pp.pandapowerNet, line_id: int, cable_catalogue:
             print("Load flow convergence issue.")
             load_flow_converge = False
     # Restore cable to previous size if necessary
-    if not (subnet.res_line.loc[line_id, "loading_percent"] < 100 and
+    if not (subnet.res_line.loc[line_id, "loading_percent"] < (100 * (1-cable_factor/100)) and
             subnet.res_line.loc[line_id, tension_of_interest] > min_v and
             load_flow_converge):
         new_cable = cable_catalogue.loc[idx_cable]

@@ -19,9 +19,10 @@ plot_network_with_plotly(net)
 
 
 
-# TODO sizing coef sécu
-#stand by loss conv
-# read droop curve ->OK
+# TODO sizing coef sécu -> ok
+#stand by loss conv -> ok
+# read droop curve -> OK
+# not cable sizing et conv -> ok
+
 # worst case
 # warning tension haute
-# not cable sizing et conv
