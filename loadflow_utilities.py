@@ -316,7 +316,7 @@ def define_voltage_limits(use_case: Dict) -> tuple:
     if use_case['Project details']['Ecosystem'] in ['CurrentOS']:
         return 0.98, 1.02
     elif use_case['Project details']['Ecosystem'] in ['ODCA',]:
-        return 0.92, 1.08
+        return 0.98, 1.02
     
 
 def define_sizing_security_factor(use_case: Dict) -> tuple:
