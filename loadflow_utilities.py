@@ -80,7 +80,6 @@ def calculate_converter_power(power: float, converter: pd.Series) -> tuple:
     adjusted_power = adjusted_power + converter['stand_by_loss'].iloc[0]
     # Calculate power loss
     power_loss = power - adjusted_power
-
     return adjusted_power, efficiency, power_loss
 
 
@@ -314,10 +313,10 @@ def define_voltage_limits(use_case: Dict) -> tuple:
     Returns:
         tuple: A tuple containing the minimum and maximum voltage limits.
     """
-    if use_case['Project details']['Ecosystem'] in ['ODCA', 'CurrentOS']:
+    if use_case['Project details']['Ecosystem'] in ['CurrentOS']:
         return 0.98, 1.02
-    else:
-        return 0.95, 1.05
+    elif use_case['Project details']['Ecosystem'] in ['ODCA',]:
+        return 0.92, 1.08
     
 
 def define_sizing_security_factor(use_case: Dict) -> tuple:
@@ -330,9 +329,9 @@ def define_sizing_security_factor(use_case: Dict) -> tuple:
     Returns:
         tuple: A tuple containing the minimum and maximum voltage limits.
     """
-    cable_factor = use_case['Conductor parameters']['Cable sizing security factor (%)']
-    AC_DC_factor = use_case['Converter details']['AC/DC converter sizing security factor (%)']
-    converter_factor = use_case['Converter details']['Other converters sizing security factor (%)']
+    cable_factor = use_case['Sizing factor']['Cable sizing security factor (%)']
+    AC_DC_factor = use_case['Sizing factor']['AC/DC converter sizing security factor (%)']
+    converter_factor = use_case['Sizing factor']['Other converters sizing security factor (%)']
     return cable_factor, AC_DC_factor, converter_factor
         
 
@@ -464,7 +463,7 @@ def select_converter_based_on_power(tmp_cc: pd.DataFrame, power_mw: float, AC_DC
         factor = AC_DC_factor
     else :
         factor = converter_factor
-    if (tmp_cc['Nominal power (kW)'] > (power_mw * 1000)).values.any():
+    if (tmp_cc['Nominal power (kW)']*(1-factor/100) > abs(power_mw * 1000)).values.any():
         # Find new converter with minimum capacity above required power
         filtered_tmp_cc = tmp_cc[tmp_cc['Nominal power (kW)']*(1-factor/100) > abs(power_mw * 1000)]
         return filtered_tmp_cc.loc[filtered_tmp_cc['Nominal power (kW)'].idxmin()],filtered_tmp_cc['Nominal power (kW)'].idxmin()

@@ -91,7 +91,7 @@ def find_upndownstream_networks(network_dict):
             bool: True if the network is upstream, False otherwise.
         """
         # If the network has an ext_grid, it is an upstream network
-        if len(network_dict[network_id]['network'].ext_grid) != 0:
+        if len(network_dict[network_id]['network'].ext_grid.loc[network_dict[network_id]['network'].ext_grid['in_service']==True]) != 0:
             return True
         # Mark the current network as visited
         visited.add(network_id)
@@ -159,7 +159,7 @@ def find_lines_between_given_line_and_ext_grid(net, line_id):
     G = pp.topology.create_nxgraph(net)
 
     # Find the node connected to the external grid
-    ext_grid_node = net.ext_grid.bus.values[0]
+    ext_grid_node = net.ext_grid.loc[net.ext_grid['in_service']==True].bus.values[0]
 
     # Find the nodes connected to the given line
     line = net.line.loc[line_id]

@@ -33,11 +33,8 @@ def create_DC_network(path: str, path_cable_catalogue: str, path_converter_catal
     line_data = xl_file.parse('Lines')
     node_data = xl_file.parse('Assets Nodes')
     converter_data = xl_file.parse('Converters')
-    converter_default = xl_file.parse('Droop curves')
-    converter_default = pd.DataFrame(
-        data=converter_default.loc[1:].values,
-        columns=converter_default.loc[0].values
-    )
+    converter_default = xl_file.parse('Default droop curves')
+
 
     # Read and process the cable catalogue
     cable_catalogue = read_cable_catalogue(path_cable_catalogue)
@@ -85,21 +82,42 @@ def _create_buses_and_components(net: pp.pandapowerNet, node_data: pd.DataFrame)
         component_type = row['Component type'].replace(' ', '').lower()
         if component_type == 'acgrid':
             pp.create_ext_grid(net, bus=bus, vm_pu=1.0)
-        elif component_type in ['dcload', 'acload', 'ev']:
+        elif component_type in ['dcload', 'acload']:
             pp.create_load(
                 net,
+                name='load ' + str(bus),
                 bus=bus,
                 p_mw=row['Maximum power (kW)'] / 1000,  # Convert kW to MW
                 q_mvar=0
             )
-        elif component_type == 'storage':
+        elif component_type=='ev':
             pp.create_storage(
                 net,
+                name='EV ' + str(bus),
                 bus=bus,
                 p_mw=row['Maximum power (kW)'] / 1000,  # Convert kW to MW
-                max_e_mwh=row['Capacity (kWh)'] / 1000,  # Convert kWh to MWh
-                soc_percent=50  # Initial state of charge at 50%
+                max_e_mwh=row['Maximum power (kW)'] / 1000 * 4,  # Convert kWh to MWh
+                soc_percent=100  # Initial state of charge at 50%
             )
+        elif component_type == 'storage':
+            if not np.isnan(row['Maximum power (kW)']):
+                pp.create_storage(
+                    net,
+                    name='Battery ' + str(bus),
+                    bus=bus,
+                    p_mw=row['Maximum power (kW)'] / 1000,  # Convert kW to MW
+                    max_e_mwh=row['Capacity (kWh)'] / 1000,  # Convert kWh to MWh
+                    soc_percent=50  # Initial state of charge at 50%
+                )
+            else :
+                pp.create_storage(
+                    net,
+                    name='Battery ' + str(bus),
+                    bus=bus,
+                    p_mw=0,  # Convert kW to MW
+                    max_e_mwh=0,  # Convert kWh to MWh
+                    soc_percent=50  # Initial state of charge at 50%
+                )
         elif component_type == 'pv':
             pp.create_sgen(
                 net,
@@ -140,16 +158,16 @@ def _create_lines(net: pp.pandapowerNet, line_data: pd.DataFrame, cable_catalogu
                 )
 
         # Create the line
-        if not np.isnan(row['Cable R_km (Ohm/km)']):
+        if not np.isnan(row['Resistance (ohm/m)']):
             pp.create_line_from_parameters(
                 net,
                 from_bus=int(row['Node_i']),
                 to_bus=int(row['Node_j']),
                 length_km=row['Line length (m)'] / 1000,
-                r_ohm_per_km=row['Cable R_km (Ohm/km)'],
+                r_ohm_per_km=row['Resistance (ohm/m)']*1000,
                 x_ohm_per_km=1e-20,
                 c_nf_per_km=0,
-                max_i_ka=row['Imax (A)'] / 1000,
+                max_i_ka=1e3,
                 cable_rank=None
             )
         else:
@@ -198,18 +216,18 @@ def _create_converters(net: pp.pandapowerNet, converter_data: pd.DataFrame, conv
 
     converter_data = converter_data.rename(columns={
         "Converter name": "name",
-        "Node_i number\nAsset side / Lower Voltage Bus side ": 'from_bus',
-        "Node_j number\nDC Grid side / Higher Voltage Bus side": 'to_bus',
+        "Node_i number": 'from_bus',
+        "Node_j number": 'to_bus',
         "Converter type": "type",
-        "Nominal power (kW)": 'Nominal Maximum power (kW)',
-        "Efficiency curve if user-efined [Xi;Yi], i={1,2,3,4}, \nwith X= Factor of Nominal Power (%), Y=Efficiency (%)": 'efficiency curve',
-        "Voltage level V_i (V)\nAsset side / Lower Voltage Bus side ": "V_i",
-        "Voltage level V_j(V)\nDC Grid side / Higher Voltage Bus side": "V_j",
-        "Droop curve if user-efined\n[Vi;Pi], i={1,2,3,4,5,6}, \nwith V=Asset voltage value (p.u.), P=Asset power value (p.u.)": 'droop_curve'
+        "Nominal power (kW)": 'Nominal power (kW)',
+        "Efficiency curve if user-defined": 'efficiency curve',
+        "Voltage level V_i (V)": "V_i",
+        "Voltage level V_j (V)": "V_j",
+        "Droop curve if user-defined": 'droop_curve'
     })
 
     for _, row in converter_data.iterrows():
-        if not np.isnan(row['Nominal Maximum power (kW)']):
+        if not np.isnan(row['Nominal power (kW)']):
             _add_converter(net, row, converter_default)
         else:
             _add_converter_from_catalogue(net, row, converter_catalogue, converter_default)
@@ -250,7 +268,7 @@ def _add_converter(net: pp.pandapowerNet, row: pd.Series, converter_default: pd.
         "from_bus": row['from_bus'],
         "to_bus": row['to_bus'],
         "type": row['type'],
-        "P": row['Nominal Maximum power (kW)'] / 1000,  # Convert kW to MW
+        "P": row['Nominal power (kW)'] / 1000,  # Convert kW to MW
         "efficiency": efficiency,
         "efficiency curve": row['efficiency curve'],
         "droop_curve": droop_curve,
@@ -365,6 +383,6 @@ def _calculate_droop_curve(row: pd.Series, converter_default: pd.DataFrame) -> n
     else:
         str_dc = converter_default.loc[
             converter_default['Converter type'] == row['type'],
-            'Default Droop curve [Vi;Pi], i={1,2,3,4,5,6}, \nwith V=Asset voltage value (p.u.), P=Asset power value (p.u.)'
+            'Default Droop curve'
         ].values[0]
         return np.array(literal_eval('[' + str_dc.replace(';', ',') + ']'))
