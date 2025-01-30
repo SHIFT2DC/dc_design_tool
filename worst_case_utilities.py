@@ -145,7 +145,7 @@ def evaluate_scenario_performance(network, use_case, scenario_name):
     scenario_network.storage.loc[battery_mask, 'p_mw'] = -current_power * storage_percent/100
 
     # Perform and visualize load flow
-    scenario_network = perform_dc_load_flow(scenario_network)
+    scenario_network = perform_dc_load_flow(scenario_network,use_case)
     plot_network_with_plotly(scenario_network)
     return scenario_network
 
@@ -200,9 +200,6 @@ def perform_comprehensive_sizing(network, cable_catalogue, use_case):
         'Worst case scenario 3 for sizing cables and AC/DC converter'
     )
     
-    print(storage_network.line.cable_rank)
-    print(scenario2_network.line.cable_rank)
-    print(scenario3_network.line.cable_rank)
     # Combine results from all scenarios
     combined_network = merge_network_components(scenario2_network,storage_network)
     final_network = merge_network_components(combined_network, scenario3_network)

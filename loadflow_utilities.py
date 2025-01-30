@@ -201,7 +201,7 @@ def process_subnetwork(network_id: int, network_dict: Dict, loadflowed_subs: Lis
     update_upstream_network(network_dict, network_id, tmp_net, net)
 
 
-def perform_dc_load_flow(net: pp.pandapowerNet) -> pp.pandapowerNet:
+def perform_dc_load_flow(net: pp.pandapowerNet,use_case: dict) -> pp.pandapowerNet:
     """
     Performs DC load flow calculation on the network.
 
@@ -225,6 +225,9 @@ def perform_dc_load_flow(net: pp.pandapowerNet) -> pp.pandapowerNet:
     # Merge results and clean network
     net_res = merge_networks([network_dict[n]['network'] for n in network_dict.keys()])
     net = clean_network(net_res, net)
+
+    _,max_v=define_voltage_limits(use_case)
+    check_high_voltage_nodes(net, voltage_threshold=max_v)
 
     return net
 
@@ -292,13 +295,16 @@ def perform_load_flow_with_sizing(net: pp.pandapowerNet, cable_catalogue: pd.Dat
     min_v, max_v = define_voltage_limits(use_case)
     cable_factor, AC_DC_factor, converter_factor = define_sizing_security_factor(use_case)
     # Step 2: Perform initial DC load flow analysis
-    net = perform_dc_load_flow(net)
+    net = perform_dc_load_flow(net,use_case)
 
     # Step 3: Adjust converter sizing based on load flow results
     adjust_converter_sizing(net, AC_DC_factor, converter_factor)
 
     # Step 4: Process subnetworks and perform cable adjustments
     net = process_subnetworks_with_cable_sizing(net, cable_catalogue, min_v, max_v,cable_factor)
+
+    _,max_v=define_voltage_limits(use_case)
+    check_high_voltage_nodes(net, voltage_threshold=max_v)
 
     return net
 
@@ -593,3 +599,45 @@ def check_downstream_line_size(subnet: pp.pandapowerNet, line_id: int, cable_cat
             optimal = False
     pp.runpp(subnet)
     return optimal
+
+import warnings
+
+def check_high_voltage_nodes(net, voltage_threshold=1.1):
+    """
+    Checks for high voltage buses not connected to static generators via transformers.
+    
+    Args:
+        net (pp.Network): Pandapower network to analyze
+        voltage_threshold (float): Voltage threshold in per unit (default: 1.1)
+    
+    Raises:
+        UserWarning: When high voltage buses are found without generator connections
+    """
+
+    # Identify overvoltage buses
+    high_voltage_buses = net.res_bus[net.res_bus.vm_pu > voltage_threshold].index
+    
+    for bus in high_voltage_buses:
+        # Find connected transformers
+        connected_converter = net.converter[(net.converter.from_bus == bus) | (net.converter.to_bus == bus)]
+        
+        sgen_connected = False
+        # Check for generators on transformer secondary side
+        for _, conv in connected_converter.iterrows():
+            other_side_bus = conv.from_bus if conv.to_bus == bus else conv.to_bus
+            
+            if other_side_bus in net.sgen.bus.values:
+                sgen_connected = True
+                break
+                
+        # Raise warning if no generator connection
+        if not sgen_connected:
+            bus_voltage = net.res_bus.at[bus, 'vm_pu']
+            warnings.warn(
+                "******WARNING******\n"
+                f"High voltage alert! Bus {bus} (voltage = {bus_voltage:.3f} pu)\n "
+                f"has no static generator connection through transformers.\n"
+                "******WARNING******\n",
+                category=UserWarning,
+                stacklevel=2
+            )
