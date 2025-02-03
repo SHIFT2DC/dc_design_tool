@@ -22,35 +22,35 @@ def read_UC_Definition(xl_file):
                                                     df.iloc[15].param:df.iloc[15].val,
                                                     df.iloc[16].param:df.iloc[16].val}
     
-    UC_Definition['Conductor parameters']={ df.iloc[19].param:df.iloc[19].val,
-                                            df.iloc[20].param:df.iloc[20].val,
-                                            df.iloc[21].param:df.iloc[21].val}
+    UC_Definition['Conductor parameters']={ df.iloc[20].param:df.iloc[20].val,
+                                            df.iloc[21].param:df.iloc[21].val,
+                                            df.iloc[22].param:df.iloc[22].val}
     
     UC_Definition['Converter details']={df.iloc[26].param:df.iloc[26].val}
 
-    UC_Definition['Sizing factor']={    df.iloc[29].param:df.iloc[29].val,
-                                        df.iloc[30].param:df.iloc[30].val,
+    UC_Definition['Sizing factor']={    df.iloc[30].param:df.iloc[30].val,
                                         df.iloc[31].param:df.iloc[31].val,
-                                        df.iloc[32].param:df.iloc[32].val}
+                                        df.iloc[32].param:df.iloc[32].val,
+                                        df.iloc[33].param:df.iloc[33].val}
     
     UC_Definition['Worst case scenario 1 for sizing of Storage DC/DC converter ']={
-                                        df.iloc[35].param:df.iloc[35].val,
-                                        df.iloc[36].param:df.iloc[36].val,
                                         df.iloc[37].param:df.iloc[37].val,
                                         df.iloc[38].param:df.iloc[38].val,
-                                        df.iloc[39].param:df.iloc[39].val}
+                                        df.iloc[39].param:df.iloc[39].val,
+                                        df.iloc[40].param:df.iloc[40].val,
+                                        df.iloc[41].param:df.iloc[41].val}
     
     UC_Definition['Worst case scenario 2 for sizing of cables and  PDU DC/DC,  DC/AC, PV DC/DC and EV DC/DC converters ']={
-                                        df.iloc[43].param:df.iloc[43].val,
-                                        df.iloc[44].param:df.iloc[44].val,
                                         df.iloc[45].param:df.iloc[45].val,
                                         df.iloc[46].param:df.iloc[46].val,
-                                        df.iloc[47].param:df.iloc[47].val}
+                                        df.iloc[47].param:df.iloc[47].val,
+                                        df.iloc[48].param:df.iloc[48].val,
+                                        df.iloc[49].param:df.iloc[49].val}
     
     UC_Definition['Worst case scenario 3 for sizing cables and AC/DC converter']={
-                                        df.iloc[50].param:df.iloc[50].val,
-                                        df.iloc[51].param:df.iloc[51].val,
                                         df.iloc[52].param:df.iloc[52].val,
                                         df.iloc[53].param:df.iloc[53].val,
-                                        df.iloc[54].param:df.iloc[54].val}
+                                        df.iloc[54].param:df.iloc[54].val,
+                                        df.iloc[55].param:df.iloc[55].val,
+                                        df.iloc[56].param:df.iloc[56].val}
     return UC_Definition

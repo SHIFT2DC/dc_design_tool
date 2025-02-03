@@ -22,10 +22,10 @@ def calculate_storage_sizing_scenario(network, cable_catalogue, use_case):
     # Extract scenario parameters
     params = use_case['Worst case scenario 1 for sizing of Storage DC/DC converter ']
     load_percent = params['Loads power factor (%)']
-    load_expansion = use_case['Sizing factor']['Load expansion factor (%)']
+    load_expansion = use_case['Sizing factor']['Loads expansion factor (%)']
     pv_percent = params['PV power factor (%)']
     ev_percent = params['EV Charging station consumption (%)']
-    storage_duration = params['Storage duration (hours)']
+    storage_duration = params['Storage duration at nominal power (hours)']
 
     # Adjust network components based on scenario parameters
     scenario_network.load['p_mw'] *= (load_percent/100) * (load_expansion/100)
@@ -89,7 +89,7 @@ def create_scenario_network(network, cable_catalogue, use_case, scenario_name):
 
     # Apply parameter adjustments
     load_percent = params['Loads power factor (%)']
-    load_expansion = sizing_params['Load expansion factor (%)']
+    load_expansion = sizing_params['Loads expansion factor (%)']
     pv_percent = params['PV power factor (%)']
     ev_percent = params['EV Charging station consumption (%)']
     storage_percent = params.get('Storage power contribution (%)', 100)
@@ -128,7 +128,7 @@ def evaluate_scenario_performance(network, use_case, scenario_name):
 
     # Apply parameter adjustments
     load_percent = params['Loads power factor (%)']
-    load_expansion = sizing_params['Load expansion factor (%)']
+    load_expansion = sizing_params['Loads expansion factor (%)']
     pv_percent = params['PV power factor (%)']
     ev_percent = params['EV Charging station consumption (%)']
     storage_percent = params.get('Storage power contribution (%)', 100)
