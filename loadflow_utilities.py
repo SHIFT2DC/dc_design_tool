@@ -676,7 +676,6 @@ def perform_dc_load_flow_with_droop(net: pp.pandapowerNet,use_case: dict) -> pp.
         pp.pandapowerNet: The network with load flow results.
     """
 
-
     #if droop is not None:
 
     #    net = droop_correction
@@ -704,27 +703,37 @@ def perform_dc_load_flow_with_droop(net: pp.pandapowerNet,use_case: dict) -> pp.
 
 def droop_correction(net):
 
-    ### DROOP CONTROL ###
-    
-    # Defining the voltage in converter and the power by PF results and load profile 
+    if net.res_bus is None: # Considering that is the start of the PF computation
 
-    v_conv = 1  # From Pandapower PF
-    pset = 0.5  # From Pandapower PF
+        pass
 
-    # Defining droop curve variables (voltage points and power points) by unzipping the values of the list of tuples
+    else:
 
-    v_droop_curve, p_droop_curve = map(list, zip(*net.converter.loc[1,'droop_curve']))
-    
-    # Computation of power point in actualized droop curve
+        ### DROOP CONTROL ###
 
-    p_droop = np.interp(v_conv, v_droop_curve, p_droop_curve)
+        # Defining the voltage in converter and the power by PF results and load profile 
 
-    # Verification of the setpoint of power against droop power point
-    
-    p_asset = min(pdroop, pset) if abs(pset) > abs(pdroop) else pdroop
+        assets_buses = net.converter.from_bus                           # Assuming that the assets are only in i bus
+        assets_buses_Idx = net.bus.index(net.bus.name == assets_buses)
 
-    # Imposition of the power in pandapower information for the converter/asset 
+        v_conv = net.res_bus.loc[assets_buses_Idx,'vm_pu'].values       # From Pandapower PF    (in pu grid)
+        p_set = 0.5  # From power profile   (in pu grid)
 
-    net.asset.loc[genIdx, 'p_mw'] = gen.droop.loc[auxPS, T].values.item() * gen.pn / 1000
+        # Defining droop curve variables (voltage points and power points) by unzipping the values of the list of tuples
+
+        v_droop_curve, p_droop_curve = map(list, zip(*net.converter.loc[1,'droop_curve']))
+
+        
+        # Computation of power point in actualized droop curve
+
+        p_droop = np.interp(v_conv, v_droop_curve, p_droop_curve)
+
+        # Verification of the setpoint of power against droop power point
+        
+        p_asset = min(p_droop, p_set) if abs(p_set) > abs(p_droop) else p_droop
+
+        # Imposition of the power in pandapower information for the converter/asset 
+
+        assets_powers = 
 
     return net
