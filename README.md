@@ -8,13 +8,13 @@
 
 ## Installation
 
-1. **Clone the repository**  
+1. **Clone the repository**    
 
 git clone [REPO_URL]  
 cd [PROJECT_FOLDER]  
 
 
-2. **Create a virtual environment**
+2. **Create a virtual environment**  
 Linux/macOS:  
 bash  
 python3.10 -m venv venv  
@@ -24,7 +24,7 @@ cmd
 py -3.10 -m venv venv  
 
 
-3. **Activate the virtual environment**
+3. **Activate the virtual environment**  
 
 Linux/macOS:  
 bash  
@@ -35,11 +35,11 @@ cmd
 .\venv\Scripts\activate  
 
 
-4. **Install dependencies**
+4. **Install dependencies**  
 
 pip install -r requirements.txt  
 
-5. **Usage**
+5. **Usage**  
 Run the main.py  
 
 With the virtual environment activated:  
@@ -47,18 +47,18 @@ With the virtual environment activated:
 python main.py  
 
 
-6. **Virtual Environment (Reminders)**
+6. **Virtual Environment (Reminders)**  
 To exit the virtual environment:  
 
 deactivate  
 
 
-7. **To delete the virtual environment:**
+7. **To delete the virtual environment:**  
 
 Simply remove the venv folder from your project directory.
 
 
-8. **Contribution**
+8. **Contribution**  
 Ensure you use Python 3.10.0 and the virtual environment.  
 
 Install dependencies from requirements.txt.  
