@@ -641,3 +641,35 @@ def check_high_voltage_nodes(net, voltage_threshold=1.1):
                 category=UserWarning,
                 stacklevel=2
             )
+
+
+
+def perform_dc_load_flow_with_droop(net: pp.pandapowerNet,use_case: dict) -> pp.pandapowerNet:
+    """
+    Performs DC load flow calculation on the network.
+
+    Args:
+        net (pp.pandapowerNet): The network to analyze.
+
+    Returns:
+        pp.pandapowerNet: The network with load flow results.
+    """
+    # Separate and sort subnetworks
+    subnetwork_list = separate_subnetworks(net)
+    network_dict = sorting_network(net, subnetwork_list)
+
+    # Initialize results
+    loadflowed_subs = []
+    initialize_converter_results(net)
+
+    # Process subnetworks sequentially
+    process_all_subnetworks(network_dict, loadflowed_subs, net)
+
+    # Merge results and clean network
+    net_res = merge_networks([network_dict[n]['network'] for n in network_dict.keys()])
+    net = clean_network(net_res, net)
+
+    _,max_v=define_voltage_limits(use_case)
+    check_high_voltage_nodes(net, voltage_threshold=max_v)
+
+    return net
