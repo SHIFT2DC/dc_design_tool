@@ -676,72 +676,11 @@ def perform_dc_load_flow_with_droop(net: pp.pandapowerNet,use_case: dict) -> pp.
         pp.pandapowerNet: The network with load flow results.
     """
 
-    ### DROOP CONTROL ###
+    #if droop is not None:
 
-    if droop is not None:
-
-        net = droop_correction
+    #    net = droop_correction
 
         
-
-
-    # Exemple of generator code (latest version)
-
-    def gendroopReadjustment(AC_net, DC_net, Genlist, Nodelist, AC_bus_voltages, DC_bus_voltages, slack_comp, base_power, T):
-
-        for i, gen in enumerate(Genlist):
-
-            # Droop curve
-            # Finding the indexes for the droop curve at the time step required
-            auxV = gen.droop.index[gen.droop['Droop'].str.contains('V')]
-            auxP = gen.droop.index[gen.droop['Droop'].str.contains(r'P\d+', regex=True)]
-            auxPS = gen.droop.index[gen.droop['Droop'].str.contains(r'P[A-Za-z]+', regex=True)]
-            auxQS = gen.droop.index[gen.droop['Droop'].str.contains(r'Q[A-Za-z]+', regex=True)]
-
-            # Identifiyng the type of grid (AC or DC, in case of hybrid grids)
-            aux_electype = next((node.elec_type for node in Nodelist if node.node_number.item() == gen.bus), None)
-
-            if aux_electype == 'AC':
-                if gen.gen_id == slack_comp:
-                    genIdx = AC_net.gen.index[gen.gen_id == AC_net.gen['name']].item()
-                else:
-                    genIdx = AC_net.sgen.index[gen.gen_id == AC_net.sgen['name']].item()
-            elif aux_electype == 'DC':
-                if gen.gen_id == slack_comp:
-                    genIdx = DC_net.gen.index[gen.gen_id == DC_net.gen['name']].item()
-                else:
-                    genIdx = DC_net.sgen.index[gen.gen_id == DC_net.sgen['name']].item()
-
-            # Computation of power of the asset
-            if aux_electype == 'DC':
-                if gen.dp_cont == 1:  # Active droop control 
-                    # Droop power point computation 
-                    pdroop = np.interp(DC_bus_voltages[gen.bus].item(), gen.droop.loc[auxV, T].values, gen.droop.loc[auxP, T].values)
-                    pset = gen.droop.loc[auxPS, T].values.item()
-
-                    # Defining the power output of the asset
-                    pgen = min(pdroop, pset) if abs(pset) > abs(pdroop) else pdroop
-
-                    # Then actualize the power output of the asset
-                    target_net = DC_net.gen if gen.gen_id == slack_comp.values else DC_net.sgen
-                    target_net.loc[genIdx, 'p_mw'] = pgen * gen.pn / 1000
-
-                else:  # Considering no droop control of the asset (constant power asset)
-                    target_net = DC_net.gen if gen.gen_id == slack_comp else DC_net.sgen
-                    target_net.loc[genIdx, 'p_mw'] = gen.droop.loc[auxPS, T].values.item() * gen.pn / 1000
-
-            # AC computation (It is considered no droop control for AC loads)
-            elif aux_electype == 'AC':
-                
-                target_net = AC_net.gen
-                target_net.loc[genIdx, 'p_mw'] = gen.droop.loc[auxPS, T].values.item() * gen.pn / 1000
-                target_net.loc[genIdx, 'q_mvar'] = gen.droop.loc[auxQS, T].values.item() * gen.pn / 1000
-
-        return AC_net, DC_net
-
-
-
-
     # Separate and sort subnetworks
     subnetwork_list = separate_subnetworks(net)
     network_dict = sorting_network(net, subnetwork_list)
@@ -759,5 +698,42 @@ def perform_dc_load_flow_with_droop(net: pp.pandapowerNet,use_case: dict) -> pp.
 
     _,max_v=define_voltage_limits(use_case)
     check_high_voltage_nodes(net, voltage_threshold=max_v)
+
+    return net
+
+def droop_correction(net):
+
+    if net.res_bus is None: # Considering that is the start of the PF computation
+
+        pass
+
+    else:
+
+        ### DROOP CONTROL ###
+
+        # Defining the voltage in converter and the power by PF results and load profile 
+
+        assets_buses = net.converter.from_bus                           # Assuming that the assets are only in i bus
+        assets_buses_Idx = net.bus.index(net.bus.name == assets_buses)
+
+        v_conv = net.res_bus.loc[assets_buses_Idx,'vm_pu'].values       # From Pandapower PF    (in pu grid)
+        p_set = 0.5  # From power profile   (in pu grid)
+
+        # Defining droop curve variables (voltage points and power points) by unzipping the values of the list of tuples
+
+        v_droop_curve, p_droop_curve = map(list, zip(*net.converter.loc[1,'droop_curve']))
+
+        
+        # Computation of power point in actualized droop curve
+
+        p_droop = np.interp(v_conv, v_droop_curve, p_droop_curve)
+
+        # Verification of the setpoint of power against droop power point
+        
+        p_asset = min(p_droop, p_set) if abs(p_set) > abs(p_droop) else p_droop
+
+        # Imposition of the power in pandapower information for the converter/asset 
+
+        assets_powers = 
 
     return net
