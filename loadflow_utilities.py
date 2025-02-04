@@ -676,11 +676,9 @@ def perform_dc_load_flow_with_droop(net: pp.pandapowerNet,use_case: dict) -> pp.
         pp.pandapowerNet: The network with load flow results.
     """
 
-    #if droop is not None:
+    # Droop contribution 
+    droop_correction(net)
 
-    #    net = droop_correction
-
-        
     # Separate and sort subnetworks
     subnetwork_list = separate_subnetworks(net)
     network_dict = sorting_network(net, subnetwork_list)
@@ -703,37 +701,46 @@ def perform_dc_load_flow_with_droop(net: pp.pandapowerNet,use_case: dict) -> pp.
 
 def droop_correction(net):
 
-    if net.res_bus is None: # Considering that is the start of the PF computation
+    ### DROOP CONTROL ###
 
-        pass
+    # Defining the voltage in converter and the power by PF results and load profile 
 
-    else:
+    for i in range(0,len(net.load)):
 
-        ### DROOP CONTROL ###
+        if np.isnan(net.load.loc[i,'droop_curve']).any():
 
-        # Defining the voltage in converter and the power by PF results and load profile 
+            pass
 
-        assets_buses = net.converter.from_bus                           # Assuming that the assets are only in i bus
-        assets_buses_Idx = net.bus.index(net.bus.name == assets_buses)
+        else:
 
-        v_conv = net.res_bus.loc[assets_buses_Idx,'vm_pu'].values       # From Pandapower PF    (in pu grid)
-        p_set = 0.5  # From power profile   (in pu grid)
+            asset_bus = net.load.loc[i,'bus']             
+            asset_bus_Idx = net.bus.index[net.bus.name == asset_bus]
 
-        # Defining droop curve variables (voltage points and power points) by unzipping the values of the list of tuples
+            if net.res_bus.empty:
+                v_asset = 1
+                net.load.loc[i,'sn_mva'] = net.load.loc[i,'p_mw']               # Save the nominal values of power in sn_mva in order to change p_mw of loads
+            else:
+                v_asset = net.res_bus.loc[asset_bus_Idx,'vm_pu'].values         # From Pandapower PF    
 
-        v_droop_curve, p_droop_curve = map(list, zip(*net.converter.loc[1,'droop_curve']))
+            p_set = 1.5*net.load.loc[i,'p_mw']                                  # From power profile    
 
-        
-        # Computation of power point in actualized droop curve
+            # Defining droop curve variables (voltage points and power points) by unzipping the values of the list of tuples
 
-        p_droop = np.interp(v_conv, v_droop_curve, p_droop_curve)
+            droop_curve = net.load.loc[i,'droop_curve']
 
-        # Verification of the setpoint of power against droop power point
-        
-        p_asset = min(p_droop, p_set) if abs(p_set) > abs(p_droop) else p_droop
+            v_droop_curve = [x for x, y in droop_curve]
+            p_droop_curve = [y for x, y in droop_curve]
+            
+            # Computation of power point in actualized droop curve
 
-        # Imposition of the power in pandapower information for the converter/asset 
+            p_droop = np.interp(v_asset, v_droop_curve, p_droop_curve)
 
-        assets_powers = 
+            # Verification of the setpoint of power against droop power point
+            
+            p_asset = min(p_droop, p_set) if abs(p_set) > abs(p_droop) else p_droop
+
+            # Imposition of the power in pandapower information for the converter/asset 
+
+            net.load.loc[i,'p_mw'] = p_asset * net.load.loc[i,'sn_mva']
 
     return net
