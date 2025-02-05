@@ -722,7 +722,7 @@ def droop_correction(net):
             else:
                 v_asset = net.res_bus.loc[asset_bus_Idx,'vm_pu'].values         # From Pandapower PF    
 
-            p_set = 1.5*net.load.loc[i,'p_mw']                                  # From power profile    
+            p_set = 1.5                                                         # From power profile    
 
             # Defining droop curve variables (voltage points and power points) by unzipping the values of the list of tuples
 
@@ -737,7 +737,7 @@ def droop_correction(net):
 
             # Verification of the setpoint of power against droop power point
             
-            p_asset = min(p_droop, p_set) if abs(p_set) > abs(p_droop) else p_droop
+            p_asset = min(p_droop, p_set) if abs(p_set) < abs(p_droop) else p_droop
 
             # Imposition of the power in pandapower information for the converter/asset 
 
