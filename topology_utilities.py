@@ -2,6 +2,7 @@ import pandapower as pp
 import pandapower.topology as top
 import networkx as nx
 
+
 def separate_subnetworks(net):
     """
     Separates the network into connected subnetworks.
@@ -27,6 +28,7 @@ def separate_subnetworks(net):
         subnetwork_list.append(sub_net)
     
     return subnetwork_list
+
 
 def sorting_network(net, subnetworks):
     """
@@ -68,6 +70,7 @@ def sorting_network(net, subnetworks):
     network_dict = find_upndownstream_networks(dic_of_subs)
 
     return network_dict
+
 
 def find_upndownstream_networks(network_dict):
     """
@@ -125,6 +128,7 @@ def find_upndownstream_networks(network_dict):
     
     return network_dict
 
+
 def merge_networks(nets):
     """
     Merges multiple pandapower networks into a single network.
@@ -143,6 +147,7 @@ def merge_networks(nets):
         merged_net = pp.merge_nets(merged_net, net, validate=False, std_prio_on_net1=True)
     
     return merged_net
+
 
 def find_lines_between_given_line_and_ext_grid(net, line_id):
     """

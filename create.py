@@ -35,7 +35,6 @@ def create_DC_network(path: str, path_cable_catalogue: str, path_converter_catal
     converter_data = xl_file.parse('Converters')
     converter_default = xl_file.parse('Default droop curves')
 
-
     # Read and process the cable catalogue
     cable_catalogue = read_cable_catalogue(path_cable_catalogue)
     cable_info = Uc['Conductor parameters']
@@ -47,18 +46,22 @@ def create_DC_network(path: str, path_cable_catalogue: str, path_converter_catal
         converter_catalogue['Ecosystem'] == Uc['Project details']['Ecosystem']
     ]
 
-    # Create buses and components
-    _create_buses_and_components(net, node_data, converter_default)
-    _create_lines(net, line_data, cable_catalogue)
+    # Create buses
+    _create_buses_and_components(net, node_data, converter_default)  # create nodes of sheet asset nodes only
+    # Create converters
+    _create_converters(net, converter_data, converter_default, converter_catalogue)
+    # Create lines
+    _create_lines(net, line_data, cable_catalogue)  # si on croise un noeud qu'on n'a pas encore vu, on le crée
 
     # Handle subnetworks and merge them
     subnetworks = separate_subnetworks(net)
     for subnetwork in subnetworks:
         _fix_zero_voltages(subnetwork)
-    net = merge_networks(subnetworks)
+    net = merge_networks(subnetworks) #supprime le champ conv
 
     # Create converters
     _create_converters(net, converter_data, converter_default, converter_catalogue)
+
 
     return net, cable_catalogue, Uc
 
@@ -83,7 +86,7 @@ def _create_buses_and_components(net: pp.pandapowerNet, node_data: pd.DataFrame,
         if component_type == 'acgrid':
             pp.create_ext_grid(net, bus=bus, vm_pu=1.0)
         elif component_type in ['dcload', 'acload']:
-            l=pp.create_load(
+            l = pp.create_load(
                 net,
                 name='load ' + str(bus),
                 bus=bus,
@@ -92,11 +95,11 @@ def _create_buses_and_components(net: pp.pandapowerNet, node_data: pd.DataFrame,
             )
             if 'default' in row['Droop curve of asset']:
                 if 'droop_curve' not in net.load.columns:
-                    net.load['droop_curve']=np.nan
+                    net.load['droop_curve'] = np.nan
                     net.load['droop_curve'] = net.load['droop_curve'].astype('object')
-                str_dc=converter_default.loc[converter_default['Converter type']==row['Component type'],'Default Droop curve'].values[0]
-                net.load.at[l,'droop_curve']=np.array(literal_eval('[' + str_dc.replace(';', ',') + ']'))
-        elif component_type=='ev':
+                str_dc = converter_default.loc[converter_default['Converter type'] == row['Component type'], 'Default Droop curve'].values[0]
+                net.load.at[l, 'droop_curve'] = np.array(literal_eval('[' + str_dc.replace(';', ',') + ']'))
+        elif component_type == 'ev':
             pp.create_storage(
                 net,
                 name='EV ' + str(bus),
@@ -280,7 +283,7 @@ def _add_converter(net: pp.pandapowerNet, row: pd.Series, converter_default: pd.
         "droop_curve": droop_curve,
         'converter_catalogue': None,
         'conv_rank': None,
-        'stand_by_loss' : 0
+        'stand_by_loss': 0
     }
     net.converter.loc[len(net.converter)] = new_row
 
@@ -344,7 +347,7 @@ def _add_converter_from_catalogue(net: pp.pandapowerNet, row: pd.Series, convert
         "droop_curve": droop_curve,
         'converter_catalogue': tmp_cc,
         "conv_rank": tmp_cc['Nominal power (kW)'].idxmin(),
-        'stand_by_loss' : conv['Stand-by losses (W)'] / 1e6
+        'stand_by_loss': conv['Stand-by losses (W)'] / 1e6
     }
     net.converter.loc[len(net.converter)] = new_row
 

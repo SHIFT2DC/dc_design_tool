@@ -4,6 +4,7 @@ from plot_utilities import plot_network_with_plotly
 import copy
 import math
 
+
 def calculate_storage_sizing_scenario(network, cable_catalogue, use_case):
     """
     Calculates battery storage requirements for worst-case scenario 1.
@@ -57,6 +58,7 @@ def calculate_storage_sizing_scenario(network, cable_catalogue, use_case):
     
     return sized_network, battery_specs
 
+
 def apply_battery_specifications(network, battery_specs):
     """
     Applies calculated battery specifications to the network model.
@@ -69,6 +71,7 @@ def apply_battery_specifications(network, battery_specs):
         battery_mask = network.storage['name'] == name
         network.storage.loc[battery_mask, 'p_mw'] = abs(specs['power_kw'] / 1000)
         network.storage.loc[battery_mask, 'max_e_mwh'] = abs(specs['energy_kwh'] / 1000)
+
 
 def create_scenario_network(network, cable_catalogue, use_case, scenario_name):
     """
@@ -110,6 +113,7 @@ def create_scenario_network(network, cable_catalogue, use_case, scenario_name):
     # Perform load flow analysis with component sizing
     return perform_load_flow_with_sizing(scenario_network, cable_catalogue, use_case)
 
+
 def evaluate_scenario_performance(network, use_case, scenario_name):
     """
     Evaluates network performance for a given scenario with visualization.
@@ -149,6 +153,7 @@ def evaluate_scenario_performance(network, use_case, scenario_name):
     plot_network_with_plotly(scenario_network)
     return scenario_network
 
+
 def merge_network_components(base_network, comparison_network):
     """
     Merges two networks while keeping the larger-rated components.
@@ -171,6 +176,7 @@ def merge_network_components(base_network, comparison_network):
     merged_network.line.loc[line_mask] = comparison_network.line.loc[line_mask]
     
     return merged_network
+
 
 def perform_comprehensive_sizing(network, cable_catalogue, use_case):
     """
@@ -205,6 +211,7 @@ def perform_comprehensive_sizing(network, cable_catalogue, use_case):
     final_network = merge_network_components(combined_network, scenario3_network)
     
     return final_network
+
 
 def validate_network_performance(network, use_case):
     """
