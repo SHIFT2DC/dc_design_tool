@@ -279,6 +279,7 @@ def all_downstream_processed(network_dict: Dict, network_id: int, loadflowed_sub
         for elem in [x[0] for x in network_dict[network_id]['direct_downstream_network']]
     )
 
+
 def perform_load_flow_with_sizing(net: pp.pandapowerNet, cable_catalogue: pd.DataFrame, use_case: Dict) -> pp.pandapowerNet:
     """
     Performs DC load flow calculation with sizing adjustments for converters and cables.
@@ -295,7 +296,7 @@ def perform_load_flow_with_sizing(net: pp.pandapowerNet, cable_catalogue: pd.Dat
     min_v, max_v = define_voltage_limits(use_case)
     cable_factor, AC_DC_factor, converter_factor = define_sizing_security_factor(use_case)
     # Step 2: Perform initial DC load flow analysis
-    net = perform_dc_load_flow(net,use_case)
+    net = perform_dc_load_flow(net, use_case)
 
     # Step 3: Adjust converter sizing based on load flow results
     adjust_converter_sizing(net, AC_DC_factor, converter_factor)
@@ -339,7 +340,6 @@ def define_sizing_security_factor(use_case: Dict) -> tuple:
     AC_DC_factor = use_case['Sizing factor']['AC/DC converter sizing security factor (%)']
     converter_factor = use_case['Sizing factor']['Other converters sizing security factor (%)']
     return cable_factor, AC_DC_factor, converter_factor
-        
 
 
 def process_subnetworks_with_cable_sizing(net: pp.pandapowerNet, cable_catalogue: pd.DataFrame, min_v: float, max_v: float, cable_factor: int) -> pp.pandapowerNet:
