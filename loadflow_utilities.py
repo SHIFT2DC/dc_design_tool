@@ -201,7 +201,7 @@ def process_subnetwork(network_id: int, network_dict: Dict, loadflowed_subs: Lis
     update_upstream_network(network_dict, network_id, tmp_net, net)
 
 
-def perform_dc_load_flow(net: pp.pandapowerNet, use_case: dict) -> pp.pandapowerNet:
+def perform_dc_load_flow(net: pp.pandapowerNet,use_case: dict) -> pp.pandapowerNet:
     """
     Performs DC load flow calculation on the network.
 
@@ -226,7 +226,7 @@ def perform_dc_load_flow(net: pp.pandapowerNet, use_case: dict) -> pp.pandapower
     net_res = merge_networks([network_dict[n]['network'] for n in network_dict.keys()])
     net = clean_network(net_res, net)
 
-    _, max_v = define_voltage_limits(use_case)
+    _,max_v=define_voltage_limits(use_case)
     check_high_voltage_nodes(net, voltage_threshold=max_v)
 
     return net
@@ -279,7 +279,6 @@ def all_downstream_processed(network_dict: Dict, network_id: int, loadflowed_sub
         for elem in [x[0] for x in network_dict[network_id]['direct_downstream_network']]
     )
 
-
 def perform_load_flow_with_sizing(net: pp.pandapowerNet, cable_catalogue: pd.DataFrame, use_case: Dict) -> pp.pandapowerNet:
     """
     Performs DC load flow calculation with sizing adjustments for converters and cables.
@@ -296,7 +295,7 @@ def perform_load_flow_with_sizing(net: pp.pandapowerNet, cable_catalogue: pd.Dat
     min_v, max_v = define_voltage_limits(use_case)
     cable_factor, AC_DC_factor, converter_factor = define_sizing_security_factor(use_case)
     # Step 2: Perform initial DC load flow analysis
-    net = perform_dc_load_flow(net, use_case)
+    net = perform_dc_load_flow(net,use_case)
 
     # Step 3: Adjust converter sizing based on load flow results
     adjust_converter_sizing(net, AC_DC_factor, converter_factor)
@@ -304,7 +303,7 @@ def perform_load_flow_with_sizing(net: pp.pandapowerNet, cable_catalogue: pd.Dat
     # Step 4: Process subnetworks and perform cable adjustments
     net = process_subnetworks_with_cable_sizing(net, cable_catalogue, min_v, max_v,cable_factor)
 
-    _, max_v = define_voltage_limits(use_case)
+    _,max_v=define_voltage_limits(use_case)
     check_high_voltage_nodes(net, voltage_threshold=max_v)
 
     return net
@@ -328,7 +327,7 @@ def define_voltage_limits(use_case: Dict) -> tuple:
 
 def define_sizing_security_factor(use_case: Dict) -> tuple:
     """
-    Defines the sizing security factor based on the use case.
+    Defines the sizing security factot based on the use case.
 
     Args:
         use_case (Dict): Dictionary specifying project details and constraints.
@@ -341,6 +340,7 @@ def define_sizing_security_factor(use_case: Dict) -> tuple:
     converter_factor = use_case['Sizing factor']['Other converters sizing security factor (%)']
     return cable_factor, AC_DC_factor, converter_factor
         
+
 
 def process_subnetworks_with_cable_sizing(net: pp.pandapowerNet, cable_catalogue: pd.DataFrame, min_v: float, max_v: float, cable_factor: int) -> pp.pandapowerNet:
     """
@@ -449,7 +449,7 @@ def adjust_converter_sizing(net: pp.pandapowerNet, AC_DC_factor: int, converter_
     for i in net.converter.index:
         if net.converter.loc[i, 'conv_rank'] is not None:
             tmp_cc = net.converter.loc[i, 'converter_catalogue']
-            new_c, new_conv_rank = select_converter_based_on_power(tmp_cc, net.res_converter.loc[i, 'p_mw'],AC_DC_factor, converter_factor)
+            new_c,new_conv_rank = select_converter_based_on_power(tmp_cc, net.res_converter.loc[i, 'p_mw'],AC_DC_factor, converter_factor)
             update_converter_efficiency_curve(net, i, new_c)
             update_converter_attributes(net, i, new_c, int(new_conv_rank))
 
@@ -465,14 +465,14 @@ def select_converter_based_on_power(tmp_cc: pd.DataFrame, power_mw: float, AC_DC
     Returns:
         pd.Series: The selected converter.
     """
-    if 'AC/DC' in tmp_cc.loc[0, 'Converter type']:
+    if 'AC/DC' in tmp_cc.loc[0,'Converter type']:
         factor = AC_DC_factor
     else :
         factor = converter_factor
     if (tmp_cc['Nominal power (kW)']*(1-factor/100) > abs(power_mw * 1000)).values.any():
         # Find new converter with minimum capacity above required power
         filtered_tmp_cc = tmp_cc[tmp_cc['Nominal power (kW)']*(1-factor/100) > abs(power_mw * 1000)]
-        return filtered_tmp_cc.loc[filtered_tmp_cc['Nominal power (kW)'].idxmin()], filtered_tmp_cc['Nominal power (kW)'].idxmin()
+        return filtered_tmp_cc.loc[filtered_tmp_cc['Nominal power (kW)'].idxmin()],filtered_tmp_cc['Nominal power (kW)'].idxmin()
     else:
         # Otherwise, select the largest converter
         return tmp_cc.loc[tmp_cc['Nominal power (kW)'].idxmax()],tmp_cc['Nominal power (kW)'].idxmax()
@@ -513,7 +513,6 @@ def update_converter_attributes(net: pp.pandapowerNet, i: int, new_c: pd.Series,
     """
     net.converter.loc[i, 'conv_rank'] = new_conv_rank
     net.converter.loc[i, 'P'] = new_c['Nominal power (kW)'] / 1000
-
 
 def adjust_cable_sizing(subnet: pp.pandapowerNet, cable_catalogue: pd.DataFrame, min_v: float, max_v: float, cable_factor: int) -> None:
     """
@@ -601,9 +600,7 @@ def check_downstream_line_size(subnet: pp.pandapowerNet, line_id: int, cable_cat
     pp.runpp(subnet)
     return optimal
 
-
 import warnings
-
 
 def check_high_voltage_nodes(net, voltage_threshold=1.1):
     """
@@ -679,11 +676,9 @@ def perform_dc_load_flow_with_droop(net: pp.pandapowerNet,use_case: dict) -> pp.
         pp.pandapowerNet: The network with load flow results.
     """
 
-    #if droop is not None:
+    # Droop contribution 
+    droop_correction(net)
 
-    #    net = droop_correction
-
-        
     # Separate and sort subnetworks
     subnetwork_list = separate_subnetworks(net)
     network_dict = sorting_network(net, subnetwork_list)
@@ -706,37 +701,46 @@ def perform_dc_load_flow_with_droop(net: pp.pandapowerNet,use_case: dict) -> pp.
 
 def droop_correction(net):
 
-    if net.res_bus is None: # Considering that is the start of the PF computation
+    ### DROOP CONTROL ###
 
-        pass
+    # Defining the voltage in converter and the power by PF results and load profile 
 
-    else:
+    for i in range(0,len(net.load)):
 
-        ### DROOP CONTROL ###
+        if np.isnan(net.load.loc[i,'droop_curve']).any():
 
-        # Defining the voltage in converter and the power by PF results and load profile 
+            pass
 
-        assets_buses = net.converter.from_bus                           # Assuming that the assets are only in i bus
-        assets_buses_Idx = net.bus.index(net.bus.name == assets_buses)
+        else:
 
-        v_conv = net.res_bus.loc[assets_buses_Idx,'vm_pu'].values       # From Pandapower PF    (in pu grid)
-        p_set = 0.5  # From power profile   (in pu grid)
+            asset_bus = net.load.loc[i,'bus']             
+            asset_bus_Idx = net.bus.index[net.bus.name == asset_bus]
 
-        # Defining droop curve variables (voltage points and power points) by unzipping the values of the list of tuples
+            if net.res_bus.empty:
+                v_asset = 1
+                net.load.loc[i,'sn_mva'] = net.load.loc[i,'p_mw']               # Save the nominal values of power in sn_mva in order to change p_mw of loads
+            else:
+                v_asset = net.res_bus.loc[asset_bus_Idx,'vm_pu'].values         # From Pandapower PF    
 
-        v_droop_curve, p_droop_curve = map(list, zip(*net.converter.loc[1,'droop_curve']))
+            p_set = 1.5                                                         # From power profile    
 
-        
-        # Computation of power point in actualized droop curve
+            # Defining droop curve variables (voltage points and power points) by unzipping the values of the list of tuples
 
-        p_droop = np.interp(v_conv, v_droop_curve, p_droop_curve)
+            droop_curve = net.load.loc[i,'droop_curve']
 
-        # Verification of the setpoint of power against droop power point
-        
-        p_asset = min(p_droop, p_set) if abs(p_set) > abs(p_droop) else p_droop
+            v_droop_curve = [x for x, y in droop_curve]
+            p_droop_curve = [y for x, y in droop_curve]
+            
+            # Computation of power point in actualized droop curve
 
-        # Imposition of the power in pandapower information for the converter/asset 
+            p_droop = np.interp(v_asset, v_droop_curve, p_droop_curve)
 
-        # assets_powers =
+            # Verification of the setpoint of power against droop power point
+            
+            p_asset = min(p_droop, p_set) if abs(p_set) < abs(p_droop) else p_droop
+
+            # Imposition of the power in pandapower information for the converter/asset 
+
+            net.load.loc[i,'p_mw'] = p_asset * net.load.loc[i,'sn_mva']
 
     return net
