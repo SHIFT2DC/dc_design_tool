@@ -49,6 +49,10 @@ def create_DC_network(path: str, path_cable_catalogue: str, path_converter_catal
 
     # Create buses and components
     _create_buses_and_components(net, node_data, converter_default)
+    
+    # Create converters
+    _create_converters(net, converter_data, converter_default, converter_catalogue)
+
     _create_lines(net, line_data, cable_catalogue)
 
     # Handle subnetworks and merge them
@@ -263,6 +267,7 @@ def _add_converter(net: pp.pandapowerNet, row: pd.Series, converter_default: pd.
             voltage_key = 'V_i' if bus_key == 'from_bus' else 'V_j'
             if not np.isnan(row[voltage_key]):
                 net.bus.loc[row[bus_key], 'vn_kv'] = row[voltage_key] / 1000
+
 
     # Calculate efficiency and droop curves
     efficiency = _calculate_efficiency(row)
