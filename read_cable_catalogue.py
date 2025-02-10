@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 
+
 def read_cable_catalogue(path_catalogue):
     """
     Reads the cable catalogue from the specified Excel file.
@@ -35,14 +36,14 @@ def process_cable_catalogue(catalogue, cable_info):
     mat = cable_info['Material ']
     isolation = cable_info['Isolation ']
     if 'Cu' in mat:
-        mat='Cu'
+        mat ='Cu'
     elif 'Al' in mat:
-        mat='Al'
+        mat ='Al'
 
     if 'PVC' in isolation:
-        isolation='PVC'
+        isolation = 'PVC'
     elif 'XLPE' in isolation:
-        isolation='XLPE'
+        isolation = 'XLPE'
         
     # Filter the catalogue based on material and isolation type
     catalogue = catalogue.loc[catalogue['materiaux'].str.lower() == mat.lower()]

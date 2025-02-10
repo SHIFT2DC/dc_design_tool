@@ -149,7 +149,7 @@ def evaluate_scenario_performance(network, use_case, scenario_name):
     scenario_network.storage.loc[battery_mask, 'p_mw'] = -current_power * storage_percent/100
 
     # Perform and visualize load flow
-    scenario_network = perform_dc_load_flow(scenario_network,use_case)
+    scenario_network = perform_dc_load_flow(scenario_network, use_case)
     plot_network_with_plotly(scenario_network)
     return scenario_network
 

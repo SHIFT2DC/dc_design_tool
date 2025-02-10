@@ -201,7 +201,7 @@ def process_subnetwork(network_id: int, network_dict: Dict, loadflowed_subs: Lis
     update_upstream_network(network_dict, network_id, tmp_net, net)
 
 
-def perform_dc_load_flow(net: pp.pandapowerNet,use_case: dict) -> pp.pandapowerNet:
+def perform_dc_load_flow(net: pp.pandapowerNet, use_case: dict) -> pp.pandapowerNet:
     """
     Performs DC load flow calculation on the network.
 
@@ -514,6 +514,7 @@ def update_converter_attributes(net: pp.pandapowerNet, i: int, new_c: pd.Series,
     net.converter.loc[i, 'conv_rank'] = new_conv_rank
     net.converter.loc[i, 'P'] = new_c['Nominal power (kW)'] / 1000
 
+
 def adjust_cable_sizing(subnet: pp.pandapowerNet, cable_catalogue: pd.DataFrame, min_v: float, max_v: float, cable_factor: int) -> None:
     """
     Adjusts the sizing of cables based on the load flow results.
@@ -600,7 +601,9 @@ def check_downstream_line_size(subnet: pp.pandapowerNet, line_id: int, cable_cat
     pp.runpp(subnet)
     return optimal
 
+
 import warnings
+
 
 def check_high_voltage_nodes(net, voltage_threshold=1.1):
     """
