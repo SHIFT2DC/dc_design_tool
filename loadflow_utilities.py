@@ -663,8 +663,8 @@ def check_high_voltage_nodes(net, voltage_threshold=1.1):
 
 
 
-
-
+#helper
+ 
 def perform_dc_load_flow_with_droop(net: pp.pandapowerNet,use_case: dict) -> pp.pandapowerNet:
     """
     Performs DC load flow calculation on the network.
