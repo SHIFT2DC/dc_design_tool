@@ -101,7 +101,7 @@ def interpolate_efficiency(power: float, converter: pd.Series) -> float:
     )
 
 
-def add_upstream_ext_grids(network_dict: Dict, network_id: int, tmp_net: pp.pandapowerNet) -> None:
+def add_upstream_ext_grids(network_dict: Dict, network_id: int, tmp_net: pp.pandapowerNet, net) -> None:
     """
     Adds external grids for upstream connections in the subnetwork.
 
@@ -113,7 +113,15 @@ def add_upstream_ext_grids(network_dict: Dict, network_id: int, tmp_net: pp.pand
     for upstream in network_dict[network_id]['direct_upstream_network']:
         bus = [x[1] for x in network_dict[upstream[0]]['direct_downstream_network']
                if x[0] == network_id][0]
-        pp.create_ext_grid(tmp_net, bus=bus, vm_pu=1.0, name='Converter emulation')
+        v=1.0
+        if (not network_dict[upstream[0]]['network'].res_bus.empty) and (net.converter.loc[net.converter['name']==upstream[2],'type'].str.contains('PDU').values[0] ):
+            v=max(0.98,network_dict[upstream[0]]['network'].res_bus.loc[upstream[1],'vm_pu'])
+            v=min(1.02,v)
+            
+        if len(tmp_net.ext_grid.loc[tmp_net.ext_grid['name']=='Converter emulation'])==0:    
+            pp.create_ext_grid(tmp_net, bus=bus, vm_pu=v, name='Converter emulation')
+        else :
+            tmp_net.ext_grid.loc[tmp_net.ext_grid['name']=='Converter emulation','vm_pu']=v
 
 
 def update_upstream_network(network_dict: Dict, network_id: int, tmp_net: pp.pandapowerNet, net: pp.pandapowerNet) -> None:
@@ -133,7 +141,6 @@ def update_upstream_network(network_dict: Dict, network_id: int, tmp_net: pp.pan
         # Get converter data and calculate power flow
         converter = net.converter.loc[net.converter.name == upstream[2]]
         adjusted_power, _, power_loss = calculate_converter_power(power, converter)
-
         # Add load to upstream network
         add_load_to_upstream(up_net, upstream[1], adjusted_power, network_id)
 
@@ -152,13 +159,16 @@ def add_load_to_upstream(up_net: pp.pandapowerNet, bus: int, adjusted_power: flo
         adjusted_power (float): The power value for the load.
         network_id (int): The ID of the subnetwork.
     """
-    pp.create_load(
-        up_net,
-        bus=bus,
-        p_mw=adjusted_power,
-        q_mvar=0,
-        name=f'Load of net {network_id}'
-    )
+    if len(up_net.load.loc[up_net.load['name']==f'Load of net {network_id}'])!=0:
+        up_net.load.loc[up_net.load['name']==f'Load of net {network_id}','p_mw']=adjusted_power
+    else:
+        pp.create_load(
+            up_net,
+            bus=bus,
+            p_mw=adjusted_power,
+            q_mvar=0,
+            name=f'Load of net {network_id}'
+        )
 
 
 def update_converter_results(net: pp.pandapowerNet, converter_name: str, adjusted_power: float, power: float, power_loss: float) -> None:
@@ -190,7 +200,7 @@ def process_subnetwork(network_id: int, network_dict: Dict, loadflowed_subs: Lis
     tmp_net = network_dict[network_id]['network']
 
     # Add external grids for upstream connections
-    add_upstream_ext_grids(network_dict, network_id, tmp_net)
+    add_upstream_ext_grids(network_dict, network_id, tmp_net, net)
 
     # Run power flow
     pp.runpp(tmp_net)
@@ -201,7 +211,7 @@ def process_subnetwork(network_id: int, network_dict: Dict, loadflowed_subs: Lis
     update_upstream_network(network_dict, network_id, tmp_net, net)
 
 
-def perform_dc_load_flow(net: pp.pandapowerNet,use_case: dict) -> pp.pandapowerNet:
+def perform_dc_load_flow(net: pp.pandapowerNet,use_case: dict, PDU_droop_control=False) -> pp.pandapowerNet:
     """
     Performs DC load flow calculation on the network.
 
@@ -214,13 +224,36 @@ def perform_dc_load_flow(net: pp.pandapowerNet,use_case: dict) -> pp.pandapowerN
     # Separate and sort subnetworks
     subnetwork_list = separate_subnetworks(net)
     network_dict = sorting_network(net, subnetwork_list)
-
-    # Initialize results
-    loadflowed_subs = []
-    initialize_converter_results(net)
-
-    # Process subnetworks sequentially
-    process_all_subnetworks(network_dict, loadflowed_subs, net)
+    err=1
+    prev_diff_volt=[0]*len(net.converter.loc[net.converter['type'].str.contains('PDU')])
+    diff_volt=[10]*len(net.converter.loc[net.converter['type'].str.contains('PDU')])
+    i=0
+    if PDU_droop_control:
+        while ((err > 1e-8) and (sum(abs(np.array(prev_diff_volt)-np.array(diff_volt)))>1e-8)) and (i<100):
+            i+=1
+        # Initialize results
+            loadflowed_subs = []
+            initialize_converter_results(net)
+        # Process subnetworks sequentially
+            process_all_subnetworks(network_dict, loadflowed_subs, net)
+            err=0
+            prev_diff_volt=diff_volt
+            diff_volt=[]
+            for network_id in network_dict.keys():
+                for upstream in network_dict[network_id]['direct_upstream_network']:
+                    bus = [x[1] for x in network_dict[upstream[0]]['direct_downstream_network']
+                        if x[0] == network_id][0]
+                    if net.converter.loc[net.converter['name']==upstream[2],'type'].str.contains('PDU').values[0]:
+                        v_upstream=network_dict[upstream[0]]['network'].res_bus.loc[upstream[1],'vm_pu']
+                        v_downstream=network_dict[network_id]['network'].res_bus.loc[bus,'vm_pu']
+                        err+=abs(v_upstream-v_downstream)
+                        diff_volt.append(v_downstream)
+    else:
+        loadflowed_subs = []
+        initialize_converter_results(net)
+        # Process subnetworks sequentially
+        process_all_subnetworks(network_dict, loadflowed_subs, net)
+                
 
     # Merge results and clean network
     net_res = merge_networks([network_dict[n]['network'] for n in network_dict.keys()])
@@ -295,7 +328,7 @@ def perform_load_flow_with_sizing(net: pp.pandapowerNet, cable_catalogue: pd.Dat
     min_v, max_v = define_voltage_limits(use_case)
     cable_factor, AC_DC_factor, converter_factor = define_sizing_security_factor(use_case)
     # Step 2: Perform initial DC load flow analysis
-    net = perform_dc_load_flow(net,use_case)
+    net = perform_dc_load_flow(net,use_case,PDU_droop_control=False)
 
     # Step 3: Adjust converter sizing based on load flow results
     adjust_converter_sizing(net, AC_DC_factor, converter_factor)

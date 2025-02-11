@@ -94,7 +94,7 @@ if __name__ == "__main__":
     N = 10
     individual_profiles = generate_computer_profiles(N, noisy_office)
     # Afficher les profils
-    plot_profiles(individual_profiles, office_profile, noisy_office)
+    #plot_profiles(individual_profiles, office_profile, noisy_office)
 
     HVAC_profile = [0.1, 0.1, 0.1, 0.5, 1, 1, 0.8, 0.7, 0.5, 0.3, 0.3, 0.3, 0.4, 0.7, 0.7, 0.5, 0.3, 0.2, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
     noisy_HVAC = add_noise_to_profile(HVAC_profile, noise_std=0.05)
@@ -109,11 +109,11 @@ if __name__ == "__main__":
     noisy_industrial_load_12h = add_noise_to_profile(industrial_load_12h, noise_std=0.05)
 
     plt.figure()
-    plt.plot(hours,noisy_EV,'g')
-    plt.plot(hours,noisy_HVAC,'r')
-    plt.plot(hours,noisy_office,'b')
-    plt.plot(hours,noisy_HVAC,'k')
-    plt.plot(hours,noisy_industrial_load_24h,'y')
+    #plt.plot(hours,EV_profile,'g')
+    #plt.plot(hours,noisy_HVAC,'r')
+    #plt.plot(hours,noisy_office,'b')
+    #plt.plot(hours,noisy_HVAC,'k')
+    #plt.plot(hours,noisy_industrial_load_24h,'y')
     plt.plot(hours,noisy_industrial_load_12h,'c')
     plt.grid()
     plt.show()

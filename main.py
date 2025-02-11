@@ -12,12 +12,14 @@ path_converter_catalogue = "Converters_Library.xlsx"
 
 net, cable_catalogue, use_case = create_DC_network(path, path_cable_catalogue, path_converter_catalogue)
 
-#net=perform_dc_load_flow(net,use_case)
+net = perform_load_flow_with_sizing(net, cable_catalogue, use_case)
+plot_network_with_plotly(net)
 
-#net = perform_load_flow_with_sizing(net, cable_catalogue, use_case)
 
-#plot_network_with_plotly(net)
+net=perform_dc_load_flow(net,use_case,PDU_droop_control=True)
+plot_network_with_plotly(net)
+
 #perform_dc_load_flow_with_droop(net,use_case)
 
-big_net=perform_comprehensive_sizing(net,cable_catalogue,use_case)
-validate_network_performance(big_net,use_case)
+# big_net=perform_comprehensive_sizing(net,cable_catalogue,use_case)
+# validate_network_performance(big_net,use_case)

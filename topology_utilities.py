@@ -14,7 +14,7 @@ def separate_subnetworks(net):
         list: A list of pandapower subnetworks.
     """
     # Create a NetworkX graph from the pandapower network
-    graph = top.create_nxgraph(net, include_trafos=False)
+    graph = top.create_nxgraph(net, include_trafos=True)
     
     # Find all connected subnetworks
     subnetworks = top.connected_components(graph)
