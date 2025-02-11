@@ -69,8 +69,9 @@ def apply_battery_specifications(network, battery_specs):
     """
     for name, specs in battery_specs.items():
         battery_mask = network.storage['name'] == name
-        network.storage.loc[battery_mask, 'p_mw'] = abs(specs['power_kw'] / 1000)
+        network.storage.loc[battery_mask, 'p_mw'] = 0
         network.storage.loc[battery_mask, 'max_e_mwh'] = abs(specs['energy_kwh'] / 1000)
+        network.storage.loc[battery_mask, 'p_nom_mw'] = abs(specs['power_kw'] / 1000)
 
 
 def create_scenario_network(network, cable_catalogue, use_case, scenario_name):

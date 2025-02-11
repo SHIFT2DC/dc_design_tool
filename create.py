@@ -33,8 +33,9 @@ def create_DC_network(path: str, path_cable_catalogue: str, path_converter_catal
     line_data = xl_file.parse('Lines')
     node_data = xl_file.parse('Assets Nodes')
     converter_data = xl_file.parse('Converters')
-    converter_default = xl_file.parse('Default droop curves')
-
+    converter_default = xl_file.parse('Default Droop Curves')
+    user_profile_data = xl_file.parse('User-defined Assets Profiles').dropna(axis=0)
+    default_assets_profile = xl_file.parse('Default Assets Profiles')
     # Read and process the cable catalogue
     cable_catalogue = read_cable_catalogue(path_cable_catalogue)
     cable_info = Uc['Conductor parameters']
@@ -47,7 +48,7 @@ def create_DC_network(path: str, path_cable_catalogue: str, path_converter_catal
     ]
 
     # Create buses and components
-    _create_buses_and_components(net, node_data, converter_default)
+    _create_buses_and_components(net, node_data, converter_default, user_profile_data, default_assets_profile)
     
     # Create converters
     _create_converters(net, converter_data, converter_default, converter_catalogue)
@@ -66,7 +67,7 @@ def create_DC_network(path: str, path_cable_catalogue: str, path_converter_catal
     return net, cable_catalogue, Uc
 
 
-def _create_buses_and_components(net: pp.pandapowerNet, node_data: pd.DataFrame, converter_default) -> None:
+def _create_buses_and_components(net: pp.pandapowerNet, node_data: pd.DataFrame, converter_default, user_profile_data, default_assets_profile) -> None:
     """
     Creates buses and components (loads, storages, etc.) in the network.
 
@@ -93,14 +94,46 @@ def _create_buses_and_components(net: pp.pandapowerNet, node_data: pd.DataFrame,
                 p_mw=row['Maximum power (kW)'] / 1000,  # Convert kW to MW
                 q_mvar=0
             )
+
             if 'default' in row['Droop curve of asset']:
                 if 'droop_curve' not in net.load.columns:
                     net.load['droop_curve'] = np.nan
                     net.load['droop_curve'] = net.load['droop_curve'].astype('object')
                 str_dc = converter_default.loc[converter_default['Converter type'] == row['Component type'],'Default Droop curve'].values[0]
                 net.load.at[l, 'droop_curve'] = np.array(literal_eval('[' + str_dc.replace(';', ',') + ']'))
+            
+            if 'p_nom_mw' not in net.load.columns:
+                net.load['p_nom_mw'] = np.nan
+                net.load['p_nom_mw'] = net.load['p_nom_mw'].astype('object')
+            net.load.at[l, 'p_nom_mw'] = row['Maximum power (kW)'] / 1000
+
+
+            if 'user-defined' in row['Asset profile type']:
+                if 'power_profile' not in net.load.columns:
+                    net.load['power_profile'] = np.nan
+                    net.load['power_profile'] = net.load['power_profile'].astype('object')
+                if 'default_power_profile' not in net.load.columns:
+                    net.load['default_power_profile'] = np.nan
+                    net.load['default_power_profile'] = net.load['default_power_profile'].astype('object')
+
+                net.load.at[l, 'default_power_profile'] = None
+                net.load.at[l, 'power_profile'] = user_profile_data[f'Profile of node {bus}'].values
+
+            else :
+                if 'power_profile' not in net.load.columns:
+                    net.load['power_profile'] = np.nan
+                    net.load['power_profile'] = net.load['power_profile'].astype('object')
+                if 'default_power_profile' not in net.load.columns:
+                    net.load['default_power_profile'] = np.nan
+                    net.load['default_power_profile'] = net.load['default_power_profile'].astype('object')
+
+                net.load.at[l, 'default_power_profile'] = default_assets_profile[row['Asset profile type']].values
+                net.load.at[l, 'power_profile'] = None
+
+
+
         elif component_type == 'ev':
-            pp.create_storage(
+            ev =pp.create_storage(
                 net,
                 name='EV ' + str(bus),
                 bus=bus,
@@ -108,6 +141,35 @@ def _create_buses_and_components(net: pp.pandapowerNet, node_data: pd.DataFrame,
                 max_e_mwh=row['Maximum power (kW)'] / 1000 * 4,  # Convert kWh to MWh
                 soc_percent=100  # Initial state of charge at 50%
             )
+
+            if 'p_nom_mw' not in net.storage.columns:
+                net.storage['p_nom_mw'] = np.nan
+                net.storage['p_nom_mw'] = net.storage['p_nom_mw'].astype('object')
+            net.storage.at[ev, 'p_nom_mw'] = row['Maximum power (kW)'] / 1000
+
+            if 'user-defined' in row['Asset profile type']:
+                if 'power_profile' not in net.storage.columns:
+                    net.storage['power_profile'] = np.nan
+                    net.storage['power_profile'] = net.storage['power_profile'].astype('object')
+                if 'default_power_profile' not in net.storage.columns:
+                    net.storage['default_power_profile'] = np.nan
+                    net.storage['default_power_profile'] = net.storage['default_power_profile'].astype('object')
+
+                net.storage.at[ev, 'default_power_profile'] = None
+                net.storage.at[ev, 'power_profile'] = user_profile_data[f'Profile of node {bus}'].values
+
+            else :
+                if 'power_profile' not in net.storage.columns:
+                    net.storage['power_profile'] = np.nan
+                    net.storage['power_profile'] = net.storage['power_profile'].astype('object')
+                if 'default_power_profile' not in net.storage.columns:
+                    net.storage['default_power_profile'] = np.nan
+                    net.storage['default_power_profile'] = net.storage['default_power_profile'].astype('object')
+
+                net.storage.at[ev, 'default_power_profile'] = default_assets_profile[row['Asset profile type']].values
+                net.storage.at[ev, 'power_profile'] = None
+
+
         elif component_type == 'storage':
             if not np.isnan(row['Maximum power (kW)']):
                 pp.create_storage(
@@ -128,11 +190,38 @@ def _create_buses_and_components(net: pp.pandapowerNet, node_data: pd.DataFrame,
                     soc_percent=50  # Initial state of charge at 50%
                 )
         elif component_type == 'pv':
-            pp.create_sgen(
+            sgen = pp.create_sgen(
                 net,
                 bus=bus,
                 p_mw=row['Maximum power (kW)'] / 1000  # Active power in MW
             )
+
+            if 'p_nom_mw' not in net.sgen.columns:
+                net.sgen['p_nom_mw'] = np.nan
+                net.sgen['p_nom_mw'] = net.sgen['p_nom_mw'].astype('object')
+            net.sgen.at[sgen, 'p_nom_mw'] = row['Maximum power (kW)'] / 1000
+
+            if 'user-defined' in row['Asset profile type']:
+                if 'power_profile' not in net.sgen.columns:
+                    net.sgen['power_profile'] = np.nan
+                    net.sgen['power_profile'] = net.sgen['power_profile'].astype('object')
+                if 'default_power_profile' not in net.sgen.columns:
+                    net.sgen['default_power_profile'] = np.nan
+                    net.sgen['default_power_profile'] = net.sgen['default_power_profile'].astype('object')
+
+                net.sgen.at[sgen, 'default_power_profile'] = None
+                net.sgen.at[sgen, 'power_profile'] = user_profile_data[f'Profile of node {bus}'].values
+
+            else :
+                if 'power_profile' not in net.sgen.columns:
+                    net.sgen['power_profile'] = np.nan
+                    net.sgen['power_profile'] = net.sgen['power_profile'].astype('object')
+                if 'default_power_profile' not in net.sgen.columns:
+                    net.sgen['default_power_profile'] = np.nan
+                    net.sgen['default_power_profile'] = net.sgen['default_power_profile'].astype('object')
+
+                net.sgen.at[sgen, 'default_power_profile'] = default_assets_profile[row['Asset profile type']].values
+                net.sgen.at[sgen, 'power_profile'] = None
 
         # Create linked converter bus if needed
         if not np.isnan(row['Node number for directly linked converter']):

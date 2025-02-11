@@ -53,4 +53,8 @@ def read_UC_Definition(xl_file):
                                         df.iloc[54].param:df.iloc[54].val,
                                         df.iloc[55].param:df.iloc[55].val,
                                         df.iloc[56].param:df.iloc[56].val}
+    
+    UC_Definition['Parameters for annual simulations']={
+                                        df.iloc[61].param:df.iloc[61].val,
+                                        df.iloc[62].param:df.iloc[62].val}
     return UC_Definition

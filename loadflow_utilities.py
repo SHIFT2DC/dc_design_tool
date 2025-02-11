@@ -11,7 +11,7 @@ import pandas as pd
 from ast import literal_eval
 from topology_utilities import separate_subnetworks, sorting_network, merge_networks, find_lines_between_given_line_and_ext_grid
 from typing import Dict, List
-
+from tqdm import tqdm
 
 def clean_network(net: pp.pandapowerNet, original_net: pp.pandapowerNet) -> pp.pandapowerNet:
     """
@@ -678,17 +678,28 @@ def check_high_voltage_nodes(net, voltage_threshold=1.1):
                 stacklevel=2
             )
 
+def update_network(net,t):
+    for i,_ in net.load.iterrows():
+        if not np.isnan(net.load.loc[i,'power_profile']).any():
+            net.load.loc[i,'p_mw']=net.load.loc[i,'power_profile'][t]*net.load.loc[i,'p_nom_mw']
+    for i,_ in net.sgen.iterrows():
+        if not np.isnan(net.sgen.loc[i,'power_profile']).any():
+            net.sgen.loc[i,'p_mw']=net.sgen.loc[i,'power_profile'][t]*net.sgen.loc[i,'p_nom_mw']
+    for i,_ in net.storage.iterrows():
+        if not np.isnan(net.storage.loc[i,'power_profile']).any():
+            net.storage.loc[i,'p_mw']=net.storage.loc[i,'power_profile'][t]*net.storage.loc[i,'p_nom_mw']
 
 
-
-
-
-
-
-
-
-
-
+def perform_timestep_dc_load_flow(net,use_case):
+    timestep=use_case['Parameters for annual simulations']['Simulation time step (mins)']
+    timelaps=use_case['Parameters for annual simulations']['Simulation period (days)']
+    number_of_timestep=int(timelaps*24*60/timestep)
+    for t in tqdm(range(number_of_timestep)):
+        update_network(net,t)
+        #net=perform_dc_load_flow_with_droop(net,use_case)
+        net=perform_dc_load_flow(net,use_case)
+        print(net.res_bus.loc[2])
+    
 
 
 
@@ -719,23 +730,7 @@ def perform_dc_load_flow_with_droop(net: pp.pandapowerNet,use_case: dict) -> pp.
 
     while error > tol:
 
-        # Separate and sort subnetworks
-        subnetwork_list = separate_subnetworks(net)
-        network_dict = sorting_network(net, subnetwork_list)
-
-        # Initialize results
-        loadflowed_subs = []
-        initialize_converter_results(net)    
-
-        # Process subnetworks sequentially
-        process_all_subnetworks(network_dict, loadflowed_subs, net)
-
-        # Merge results and clean network
-        net_res = merge_networks([network_dict[n]['network'] for n in network_dict.keys()])
-        net = clean_network(net_res, net)
-
-        _,max_v=define_voltage_limits(use_case)
-        check_high_voltage_nodes(net, voltage_threshold=max_v)
+        net=perform_dc_load_flow(net,use_case,PDU_droop_control=True)
 
         bus_voltages = net.res_bus.vm_pu.values
 
@@ -752,9 +747,6 @@ def perform_dc_load_flow_with_droop(net: pp.pandapowerNet,use_case: dict) -> pp.
         droop_correction(net,t)
 
         t = t + 1
-
-        print(t)
-
     return net
 
 def compute_error(bus_voltages, bus_voltages_previous):
@@ -817,7 +809,7 @@ def droop_correction(net,t):
 
         p_droop = np.interp(v_asset, v_droop_curve, p_droop_curve, left = min(p_droop_curve), right = max(p_droop_curve))
 
-        # Verification of the setpoint of power against droop power point
+        # Verification of the setpoint of power against droop power point 
         
         p_asset = min(p_droop, p_set) if abs(p_set) < abs(p_droop) else p_droop
 
