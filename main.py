@@ -6,8 +6,8 @@ from loadflow_utilities import perform_dc_load_flow,perform_load_flow_with_sizin
 from worst_case_utilities import perform_comprehensive_sizing,validate_network_performance
 from tqdm import tqdm
 
-path = 'grid_data_input_file_building_demo.xlsx'
-# path = 'grid_data_input_file_WIP_v1.xlsx'
+#path = 'grid_data_input_file_building_demo.xlsx'
+path = 'grid_data_input_file_WIP_v1.xlsx'
 path_cable_catalogue = "cable_catalogue.xlsx"
 path_converter_catalogue = "Converters_Library.xlsx"
 
