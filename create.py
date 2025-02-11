@@ -35,7 +35,6 @@ def create_DC_network(path: str, path_cable_catalogue: str, path_converter_catal
     converter_data = xl_file.parse('Converters')
     converter_default = xl_file.parse('Default droop curves')
 
-
     # Read and process the cable catalogue
     cable_catalogue = read_cable_catalogue(path_cable_catalogue)
     cable_info = Uc['Conductor parameters']
@@ -87,7 +86,7 @@ def _create_buses_and_components(net: pp.pandapowerNet, node_data: pd.DataFrame,
         if component_type == 'acgrid':
             pp.create_ext_grid(net, bus=bus, vm_pu=1.0)
         elif component_type in ['dcload', 'acload']:
-            l=pp.create_load(
+            l = pp.create_load(
                 net,
                 name='load ' + str(bus),
                 bus=bus,
@@ -96,11 +95,11 @@ def _create_buses_and_components(net: pp.pandapowerNet, node_data: pd.DataFrame,
             )
             if 'default' in row['Droop curve of asset']:
                 if 'droop_curve' not in net.load.columns:
-                    net.load['droop_curve']=np.nan
+                    net.load['droop_curve'] = np.nan
                     net.load['droop_curve'] = net.load['droop_curve'].astype('object')
-                str_dc=converter_default.loc[converter_default['Converter type']==row['Component type'],'Default Droop curve'].values[0]
-                net.load.at[l,'droop_curve']=np.array(literal_eval('[' + str_dc.replace(';', ',') + ']'))
-        elif component_type=='ev':
+                str_dc = converter_default.loc[converter_default['Converter type'] == row['Component type'],'Default Droop curve'].values[0]
+                net.load.at[l, 'droop_curve'] = np.array(literal_eval('[' + str_dc.replace(';', ',') + ']'))
+        elif component_type == 'ev':
             pp.create_storage(
                 net,
                 name='EV ' + str(bus),
@@ -119,7 +118,7 @@ def _create_buses_and_components(net: pp.pandapowerNet, node_data: pd.DataFrame,
                     max_e_mwh=row['Capacity (kWh)'] / 1000,  # Convert kWh to MWh
                     soc_percent=50  # Initial state of charge at 50%
                 )
-            else :
+            else:
                 pp.create_storage(
                     net,
                     name='Battery ' + str(bus),
@@ -267,7 +266,6 @@ def _add_converter(net: pp.pandapowerNet, row: pd.Series, converter_default: pd.
             voltage_key = 'V_i' if bus_key == 'from_bus' else 'V_j'
             if not np.isnan(row[voltage_key]):
                 net.bus.loc[row[bus_key], 'vn_kv'] = row[voltage_key] / 1000
-
 
     # Calculate efficiency and droop curves
     efficiency = _calculate_efficiency(row)
