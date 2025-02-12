@@ -11,7 +11,7 @@ import pandas as pd
 from ast import literal_eval
 from topology_utilities import separate_subnetworks, sorting_network, merge_networks, find_lines_between_given_line_and_ext_grid
 from typing import Dict, List
-from tqdm import tqdm
+
 
 def clean_network(net: pp.pandapowerNet, original_net: pp.pandapowerNet) -> pp.pandapowerNet:
     """
@@ -678,28 +678,17 @@ def check_high_voltage_nodes(net, voltage_threshold=1.1):
                 stacklevel=2
             )
 
-def update_network(net,t):
-    for i,_ in net.load.iterrows():
-        if not np.isnan(net.load.loc[i,'power_profile']).any():
-            net.load.loc[i,'p_mw']=net.load.loc[i,'power_profile'][t]*net.load.loc[i,'p_nom_mw']
-    for i,_ in net.sgen.iterrows():
-        if not np.isnan(net.sgen.loc[i,'power_profile']).any():
-            net.sgen.loc[i,'p_mw']=net.sgen.loc[i,'power_profile'][t]*net.sgen.loc[i,'p_nom_mw']
-    for i,_ in net.storage.iterrows():
-        if not np.isnan(net.storage.loc[i,'power_profile']).any():
-            net.storage.loc[i,'p_mw']=net.storage.loc[i,'power_profile'][t]*net.storage.loc[i,'p_nom_mw']
 
 
-def perform_timestep_dc_load_flow(net,use_case):
-    timestep=use_case['Parameters for annual simulations']['Simulation time step (mins)']
-    timelaps=use_case['Parameters for annual simulations']['Simulation period (days)']
-    number_of_timestep=int(timelaps*24*60/timestep)
-    for t in tqdm(range(number_of_timestep)):
-        update_network(net,t)
-        #net=perform_dc_load_flow_with_droop(net,use_case)
-        net=perform_dc_load_flow(net,use_case)
-        print(net.res_bus.loc[2])
-    
+
+
+
+
+
+
+
+
+
 
 
 
@@ -728,9 +717,25 @@ def perform_dc_load_flow_with_droop(net: pp.pandapowerNet,use_case: dict) -> pp.
     tol = 1e-2
     t = 0
 
-    while error > tol:
+    while abs(error) > tol:
 
-        net=perform_dc_load_flow(net,use_case,PDU_droop_control=True)
+        # Separate and sort subnetworks
+        subnetwork_list = separate_subnetworks(net)
+        network_dict = sorting_network(net, subnetwork_list)
+
+        # Initialize results
+        loadflowed_subs = []
+        initialize_converter_results(net)    
+
+        # Process subnetworks sequentially
+        process_all_subnetworks(network_dict, loadflowed_subs, net)
+
+        # Merge results and clean network
+        net_res = merge_networks([network_dict[n]['network'] for n in network_dict.keys()])
+        net = clean_network(net_res, net)
+
+        _,max_v=define_voltage_limits(use_case)
+        check_high_voltage_nodes(net, voltage_threshold=max_v)
 
         bus_voltages = net.res_bus.vm_pu.values
 
@@ -744,9 +749,11 @@ def perform_dc_load_flow_with_droop(net: pp.pandapowerNet,use_case: dict) -> pp.
         bus_voltages_previous = bus_voltages
 
         # Correct the power of each converter/asset according to droop curve
-        droop_correction(net,t)
+        droop_correction(net,t,error,tol)
 
         t = t + 1
+
+
     return net
 
 def compute_error(bus_voltages, bus_voltages_previous):
@@ -756,7 +763,7 @@ def compute_error(bus_voltages, bus_voltages_previous):
 
     return max_deviation * 100  # Error in percentage
 
-def droop_correction(net,t):
+def droop_correction(net,t,error,tol):
 
     ### DROOP CONTROL ###
 
@@ -809,7 +816,7 @@ def droop_correction(net,t):
 
         p_droop = np.interp(v_asset, v_droop_curve, p_droop_curve, left = min(p_droop_curve), right = max(p_droop_curve))
 
-        # Verification of the setpoint of power against droop power point 
+        # Verification of the setpoint of power against droop power point
         
         p_asset = min(p_droop, p_set) if abs(p_set) < abs(p_droop) else p_droop
 
@@ -852,6 +859,7 @@ def droop_correction(net,t):
         v_droop_curve = [x for x, y in droop_curve]
         p_droop_curve = [y for x, y in droop_curve]
         v_droop_curve.sort()
+        p_droop_curve.sort(reverse=True)
         
         # Computation of power point in actualized droop curve
 
@@ -876,7 +884,7 @@ def droop_correction(net,t):
 
         if net.res_bus.empty or t == 0:
             v_asset = 1
-            net.storage.loc[i,'sn_mva'] = net.storage.loc[i,'p_mw'].item()        # Nominal Power (Saving the nominal values of power in sn_mva in order to change p_mw of assets)
+            net.storage.loc[i,'sn_mva'] = net.storage.loc[i,'p_mw'].item()  # Nominal Power (Saving the nominal values of power in sn_mva in order to change p_mw of assets)
         else:
             v_asset = net.res_bus.loc[asset_bus_Idx,'vm_pu'].item()         # Voltage value (From Pandapower PF)
 
@@ -900,6 +908,7 @@ def droop_correction(net,t):
         v_droop_curve = [x for x, y in droop_curve]
         p_droop_curve = [y for x, y in droop_curve]
         v_droop_curve.sort()
+        p_droop_curve.sort(reverse=True)
         
         # Computation of power point in actualized droop curve
 
@@ -909,9 +918,43 @@ def droop_correction(net,t):
         
         p_asset = min(p_droop, p_set) if abs(p_set) < abs(p_droop) else p_droop
 
+        # Computation of SOC change (In progress)
+
+        # Obtaining the initial SOC
+
+        ini_SOC = net.storage.loc[i, 'soc_percent'].item()
+        SOC_max = 80
+        SOC_min = 20
+        period_duration = 1
+        max_ener = net.storage.loc[i, 'max_e_mwh'].item()
+
+        # SOC computation
+        is_positive = p_asset > 0                                                                                   # Pandapower assumes that positive power in storage ats as a load (charging)
+        SOC_change = ((p_asset * net.storage.loc[i,'sn_mva'].item() * period_duration) / max_ener) * 100            # SOC change (in %) Misses change 1 by period duration of each time step
+        SOC_f = SOC_change + ini_SOC if is_positive else ini_SOC - SOC_change
+
+        # Verification of the limits of SOC
+
+        if SOC_f < SOC_min: 
+        
+            SOC_max_var = ini_SOC - SOC_min
+            p_asset = (SOC_max_var / (100 * period_duration)) * (max_ener / net.storage.loc[i,'sn_mva'].item()) 
+            SOC_f = ini_SOC + SOC_max_var
+        
+        elif SOC_f > SOC_max: 
+        
+            SOC_max_var = SOC_max - ini_SOC
+            p_asset = (SOC_max_var / (100 * period_duration)) * (max_ener / net.storage.loc[i,'sn_mva'].item()) 
+            SOC_f = ini_SOC + SOC_max_var
+
+        # Verification of the error, for SOC atualization
+
+        if abs(error) < tol:
+        
+            net.storage.loc[i, 'soc_percent'] = SOC_f
+
         # Imposition of the power in pandapower information for the converter/asset 
 
         net.storage.loc[i,'p_mw'] = p_asset * net.storage.loc[i,'sn_mva'].item() 
-
 
     return net
