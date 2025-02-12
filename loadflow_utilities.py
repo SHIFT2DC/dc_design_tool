@@ -682,39 +682,28 @@ def check_high_voltage_nodes(net, voltage_threshold=1.1):
             )
 
 def update_network(net,t):
-
     for i,_ in net.load.iterrows():
-
         if not np.isnan(net.load.loc[i,'power_profile']).any():
-
             net.load.loc[i,'p_mw']=net.load.loc[i,'power_profile'][t]*net.load.loc[i,'p_nom_mw']
 
     for i,_ in net.sgen.iterrows():
-
         if not np.isnan(net.sgen.loc[i,'power_profile']).any():
-
             net.sgen.loc[i,'p_mw']=net.sgen.loc[i,'power_profile'][t]*net.sgen.loc[i,'p_nom_mw']
 
     for i,_ in net.storage.iterrows():
-
         if not np.isnan(net.storage.loc[i,'power_profile']).any():
-
             net.storage.loc[i,'p_mw']=net.storage.loc[i,'power_profile'][t]*net.storage.loc[i,'p_nom_mw']
 
-def perform_timestep_dc_load_flow(net,use_case):
 
 def perform_timestep_dc_load_flow(net,use_case):
 
     timestep=use_case['Parameters for annual simulations']['Simulation time step (mins)']
-
     timelaps=use_case['Parameters for annual simulations']['Simulation period (days)']
-
     number_of_timestep=int(timelaps*24*60/timestep)
 
     for t in tqdm(range(number_of_timestep)):
-
         #net=perform_dc_load_flow_with_droop(net,use_case)
-
+        net = perform_dc_load_flow(net, use_case)
         print(net.res_bus.loc[2])
 
     
