@@ -107,7 +107,6 @@ def _create_buses_and_components(net: pp.pandapowerNet, node_data: pd.DataFrame,
                 net.load['p_nom_mw'] = net.load['p_nom_mw'].astype('object')
             net.load.at[l, 'p_nom_mw'] = row['Maximum power (kW)'] / 1000
 
-
             if 'user-defined' in row['Asset profile type']:
                 if 'power_profile' not in net.load.columns:
                     net.load['power_profile'] = np.nan
@@ -129,8 +128,6 @@ def _create_buses_and_components(net: pp.pandapowerNet, node_data: pd.DataFrame,
 
                 net.load.at[l, 'default_power_profile'] = default_assets_profile[row['Asset profile type']].values
                 net.load.at[l, 'power_profile'] = None
-
-
 
         elif component_type == 'ev':
             ev =pp.create_storage(
@@ -158,7 +155,7 @@ def _create_buses_and_components(net: pp.pandapowerNet, node_data: pd.DataFrame,
                 net.storage.at[ev, 'default_power_profile'] = None
                 net.storage.at[ev, 'power_profile'] = user_profile_data[f'Profile of node {bus}'].values
 
-            else :
+            else:
                 if 'power_profile' not in net.storage.columns:
                     net.storage['power_profile'] = np.nan
                     net.storage['power_profile'] = net.storage['power_profile'].astype('object')
@@ -168,7 +165,6 @@ def _create_buses_and_components(net: pp.pandapowerNet, node_data: pd.DataFrame,
 
                 net.storage.at[ev, 'default_power_profile'] = default_assets_profile[row['Asset profile type']].values
                 net.storage.at[ev, 'power_profile'] = None
-
 
         elif component_type == 'storage':
             if not np.isnan(row['Maximum power (kW)']):

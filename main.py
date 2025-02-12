@@ -7,7 +7,6 @@ from worst_case_utilities import perform_comprehensive_sizing,validate_network_p
 from tqdm import tqdm
 
 
-
 path = 'grid_data_input_file_building_demo.xlsx'
 #path = 'grid_data_input_file_WIP_v1.xlsx'
 path_cable_catalogue = "cable_catalogue.xlsx"
@@ -15,13 +14,14 @@ path_converter_catalogue = "Converters_Library.xlsx"
 
 net, cable_catalogue, use_case = create_DC_network(path, path_cable_catalogue, path_converter_catalogue)
 
-net=perform_comprehensive_sizing(net,cable_catalogue,use_case)
+net = perform_comprehensive_sizing(net, cable_catalogue, use_case)
+scenario1, scenario2, scenario3 = validate_network_performance(net, use_case)
 
 #net = perform_dc_load_flow(net, use_case)
 
 #net = perform_dc_load_flow_with_droop(net, use_case)
 
-net,result=perform_timestep_dc_load_flow(net,use_case)
+net, result = perform_timestep_dc_load_flow(net, use_case)
 
 #net=perform_dc_load_flow(net,use_case,PDU_droop_control=True)
 #plot_network_with_plotly(net)
