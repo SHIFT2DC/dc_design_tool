@@ -11,6 +11,7 @@ import pandas as pd
 from ast import literal_eval
 from topology_utilities import separate_subnetworks, sorting_network, merge_networks, find_lines_between_given_line_and_ext_grid
 from typing import Dict, List
+from tqdm import tqdm
 
 
 def clean_network(net: pp.pandapowerNet, original_net: pp.pandapowerNet) -> pp.pandapowerNet:
