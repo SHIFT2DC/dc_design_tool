@@ -717,7 +717,7 @@ def perform_dc_load_flow_with_droop(net: pp.pandapowerNet,use_case: dict) -> pp.
     tol = 1e-2
     t = 0
 
-    while error > tol:
+    while abs(error) > tol:
 
         # Separate and sort subnetworks
         subnetwork_list = separate_subnetworks(net)
@@ -749,11 +749,10 @@ def perform_dc_load_flow_with_droop(net: pp.pandapowerNet,use_case: dict) -> pp.
         bus_voltages_previous = bus_voltages
 
         # Correct the power of each converter/asset according to droop curve
-        droop_correction(net,t)
+        droop_correction(net,t,error,tol)
 
         t = t + 1
 
-        print(t)
 
     return net
 
@@ -764,7 +763,7 @@ def compute_error(bus_voltages, bus_voltages_previous):
 
     return max_deviation * 100  # Error in percentage
 
-def droop_correction(net,t):
+def droop_correction(net,t,error,tol):
 
     ### DROOP CONTROL ###
 
@@ -860,6 +859,7 @@ def droop_correction(net,t):
         v_droop_curve = [x for x, y in droop_curve]
         p_droop_curve = [y for x, y in droop_curve]
         v_droop_curve.sort()
+        p_droop_curve.sort(reverse=True)
         
         # Computation of power point in actualized droop curve
 
@@ -884,7 +884,7 @@ def droop_correction(net,t):
 
         if net.res_bus.empty or t == 0:
             v_asset = 1
-            net.storage.loc[i,'sn_mva'] = net.storage.loc[i,'p_mw'].item()        # Nominal Power (Saving the nominal values of power in sn_mva in order to change p_mw of assets)
+            net.storage.loc[i,'sn_mva'] = net.storage.loc[i,'p_mw'].item()  # Nominal Power (Saving the nominal values of power in sn_mva in order to change p_mw of assets)
         else:
             v_asset = net.res_bus.loc[asset_bus_Idx,'vm_pu'].item()         # Voltage value (From Pandapower PF)
 
@@ -908,6 +908,7 @@ def droop_correction(net,t):
         v_droop_curve = [x for x, y in droop_curve]
         p_droop_curve = [y for x, y in droop_curve]
         v_droop_curve.sort()
+        p_droop_curve.sort(reverse=True)
         
         # Computation of power point in actualized droop curve
 
@@ -917,9 +918,43 @@ def droop_correction(net,t):
         
         p_asset = min(p_droop, p_set) if abs(p_set) < abs(p_droop) else p_droop
 
+        # Computation of SOC change (In progress)
+
+        # Obtaining the initial SOC
+
+        ini_SOC = net.storage.loc[i, 'soc_percent'].item()
+        SOC_max = 80
+        SOC_min = 20
+        period_duration = 1
+        max_ener = net.storage.loc[i, 'max_e_mwh'].item()
+
+        # SOC computation
+        is_positive = p_asset > 0                                                                                   # Pandapower assumes that positive power in storage ats as a load (charging)
+        SOC_change = ((p_asset * net.storage.loc[i,'sn_mva'].item() * period_duration) / max_ener) * 100            # SOC change (in %) Misses change 1 by period duration of each time step
+        SOC_f = SOC_change + ini_SOC if is_positive else ini_SOC - SOC_change
+
+        # Verification of the limits of SOC
+
+        if SOC_f < SOC_min: 
+        
+            SOC_max_var = ini_SOC - SOC_min
+            p_asset = (SOC_max_var / (100 * period_duration)) * (max_ener / net.storage.loc[i,'sn_mva'].item()) 
+            SOC_f = ini_SOC + SOC_max_var
+        
+        elif SOC_f > SOC_max: 
+        
+            SOC_max_var = SOC_max - ini_SOC
+            p_asset = (SOC_max_var / (100 * period_duration)) * (max_ener / net.storage.loc[i,'sn_mva'].item()) 
+            SOC_f = ini_SOC + SOC_max_var
+
+        # Verification of the error, for SOC atualization
+
+        if abs(error) < tol:
+        
+            net.storage.loc[i, 'soc_percent'] = SOC_f
+
         # Imposition of the power in pandapower information for the converter/asset 
 
         net.storage.loc[i,'p_mw'] = p_asset * net.storage.loc[i,'sn_mva'].item() 
-
 
     return net
