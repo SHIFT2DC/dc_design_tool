@@ -690,15 +690,58 @@ def update_network(net,t):
             net.storage.loc[i,'p_mw']=net.storage.loc[i,'power_profile'][t]*net.storage.loc[i,'p_nom_mw']
 
 
+def format_result_dataframe(df,net):
+    for i,row in net.bus.iterrows():
+        df[f'noeud {i} : v_pu']=np.nan
+    for i,row in net.line.iterrows():
+        df[f'line {row.from_bus} - {row.to_bus} : i_ka']=np.nan
+        df[f'line {row.from_bus} - {row.to_bus} : loading']=np.nan
+        df[f'line {row.from_bus} - {row.to_bus} : pl_mw']=np.nan
+    for i,row in net.load.iterrows():
+        df[f'load {row["name"]} : p_mw']=np.nan
+    for i,row in net.sgen.iterrows():
+        df[f'sgen {row["name"]} : p_mw']=np.nan    
+    for i,row in net.storage.iterrows():
+        df[f'storage {row["name"]} : p_mw']=np.nan
+    for i,row in net.converter.iterrows():
+        df[f'{row["name"]} : p_mw']=np.nan
+        df[f'{row["name"]} : loading']=np.nan
+        df[f'{row["name"]} : pl_mw']=np.nan
+    return df
+
+def fill_result_dataframe(df,t,net):
+    for i,row in net.bus.iterrows():
+        df.loc[t,f'noeud {i} : v_pu']=net.res_bus.loc[i,'vm_pu']
+    for i,row in net.line.iterrows():
+        df.loc[t,f'line {row.from_bus} - {row.to_bus} : i_ka']=net.res_line.loc[i,'i_ka']
+        df.loc[t,f'line {row.from_bus} - {row.to_bus} : loading']=net.res_line.loc[i,'loading_percent']
+        df.loc[t,f'line {row.from_bus} - {row.to_bus} : pl_mw']=net.res_line.loc[i,'pl_mw']
+    for i,row in net.load.iterrows():
+        df.loc[t,f'load {row["name"]} : p_mw']=net.res_load.loc[i,'p_mw']
+    for i,row in net.sgen.iterrows():
+        df.loc[t,f'sgen {row["name"]} : p_mw']=net.res_sgen.loc[i,'p_mw']   
+    for i,row in net.storage.iterrows():
+        df.loc[t,f'storage {row["name"]} : p_mw']=net.res_storage.loc[i,'p_mw']
+    for i,row in net.converter.iterrows():
+        df[f'{row["name"]} : p_mw']=net.res_converter.loc[i,'p_mw']
+        df[f'{row["name"]} : loading']=net.res_converter.loc[i,'loading (%)']
+        df[f'{row["name"]} : pl_mw']=net.res_converter.loc[i,'pl_mw']
+    return df
+
+
 def perform_timestep_dc_load_flow(net,use_case):
     timestep=use_case['Parameters for annual simulations']['Simulation time step (mins)']
     timelaps=use_case['Parameters for annual simulations']['Simulation period (days)']
     number_of_timestep=int(timelaps*24*60/timestep)
+    result=pd.DataFrame(index=range(number_of_timestep))
+
     for t in tqdm(range(number_of_timestep)):
         update_network(net,t)
-        #net=perform_dc_load_flow_with_droop(net,use_case)
         net=perform_dc_load_flow(net,use_case)
-        print(net.res_bus.loc[2])
+        #net=perform_dc_load_flow(net,use_case)
+
+        result=fill_result_dataframe(result,t,net)
+    return net,result
     
 
 
