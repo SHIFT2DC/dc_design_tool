@@ -635,11 +635,7 @@ def check_downstream_line_size(subnet: pp.pandapowerNet, line_id: int, cable_cat
     pp.runpp(subnet)
     return optimal
 
-        net=perform_dc_load_flow(net,use_case)
-
 import warnings
-
-        update_network(net,t)
 
 def check_high_voltage_nodes(net, voltage_threshold=1.1):
     """
