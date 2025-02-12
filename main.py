@@ -26,6 +26,4 @@ net,result=perform_timestep_dc_load_flow(net,use_case)
 #net=perform_dc_load_flow(net,use_case,PDU_droop_control=True)
 #plot_network_with_plotly(net)
 
-#plot_network_with_plotly(net)
-
 #validate_network_performance(big_net,use_case)

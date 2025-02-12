@@ -693,7 +693,7 @@ def update_network(net,t):
 
 def format_result_dataframe(df,net):
     for i,row in net.bus.iterrows():
-        df[f'noeud {i} : v_pu']=np.nan
+        df[f'node {i} : v_pu']=np.nan
     for i,row in net.line.iterrows():
         df[f'line {row.from_bus} - {row.to_bus} : i_ka']=np.nan
         df[f'line {row.from_bus} - {row.to_bus} : loading']=np.nan
@@ -704,6 +704,8 @@ def format_result_dataframe(df,net):
         df[f'sgen {row["name"]} : p_mw']=np.nan    
     for i,row in net.storage.iterrows():
         df[f'storage {row["name"]} : p_mw']=np.nan
+        if "Battery" in row["name"]:
+            df[f'storage {row["name"]} : SOC']=np.nan
     for i,row in net.converter.iterrows():
         df[f'{row["name"]} : p_mw']=np.nan
         df[f'{row["name"]} : loading']=np.nan
@@ -712,7 +714,7 @@ def format_result_dataframe(df,net):
 
 def fill_result_dataframe(df,t,net):
     for i,row in net.bus.iterrows():
-        df.loc[t,f'noeud {i} : v_pu']=net.res_bus.loc[i,'vm_pu']
+        df.loc[t,f'node {i} : v_pu']=net.res_bus.loc[i,'vm_pu']
     for i,row in net.line.iterrows():
         df.loc[t,f'line {row.from_bus} - {row.to_bus} : i_ka']=net.res_line.loc[i,'i_ka']
         df.loc[t,f'line {row.from_bus} - {row.to_bus} : loading']=net.res_line.loc[i,'loading_percent']
@@ -723,12 +725,13 @@ def fill_result_dataframe(df,t,net):
         df.loc[t,f'sgen {row["name"]} : p_mw']=net.res_sgen.loc[i,'p_mw']   
     for i,row in net.storage.iterrows():
         df.loc[t,f'storage {row["name"]} : p_mw']=net.res_storage.loc[i,'p_mw']
+        if "Battery" in row["name"]:
+            df.loc[t,f'storage {row["name"]} : SOC']=net.storage.loc[i,'soc_percent']
     for i,row in net.converter.iterrows():
-        df[f'{row["name"]} : p_mw']=net.res_converter.loc[i,'p_mw']
-        df[f'{row["name"]} : loading']=net.res_converter.loc[i,'loading (%)']
-        df[f'{row["name"]} : pl_mw']=net.res_converter.loc[i,'pl_mw']
+        df.loc[t,f'{row["name"]} : p_mw']=net.res_converter.loc[i,'p_mw']
+        df.loc[t,f'{row["name"]} : loading']=net.res_converter.loc[i,'loading (%)']
+        df.loc[t,f'{row["name"]} : pl_mw']=net.res_converter.loc[i,'pl_mw']
     return df
-
 
 def perform_timestep_dc_load_flow(net,use_case):
 
@@ -739,10 +742,14 @@ def perform_timestep_dc_load_flow(net,use_case):
 
     for t in tqdm(range(number_of_timestep)):
         update_network(net,t)
-        net=perform_dc_load_flow(net,use_case)
-        #net=perform_dc_load_flow(net,use_case)
 
+        #net=perform_dc_load_flow(net,use_case)
+        net=perform_dc_load_flow_with_droop(net,use_case,t,timestep/60)
         result=fill_result_dataframe(result,t,net)
+    
+
+    result[[x for x in result.columns if 'load ' in x]].plot()
+
     return net,result
     
 
@@ -757,7 +764,7 @@ def perform_timestep_dc_load_flow(net,use_case):
 
 #helper
  
-def perform_dc_load_flow_with_droop(net: pp.pandapowerNet,use_case: dict) -> pp.pandapowerNet:
+def perform_dc_load_flow_with_droop(net: pp.pandapowerNet,use_case: dict,t,time_step_duration) -> pp.pandapowerNet:
     """
     Performs DC load flow calculation on the network.
 
@@ -771,27 +778,11 @@ def perform_dc_load_flow_with_droop(net: pp.pandapowerNet,use_case: dict) -> pp.
 
     error = 1
     tol = 1e-2
-    t = 0
+    it = 0
 
-    while abs(error) > tol:
+    while (abs(error) > tol) and (it<=20):
 
-        # Separate and sort subnetworks
-        subnetwork_list = separate_subnetworks(net)
-        network_dict = sorting_network(net, subnetwork_list)
-
-        # Initialize results
-        loadflowed_subs = []
-        initialize_converter_results(net)    
-
-        # Process subnetworks sequentially
-        process_all_subnetworks(network_dict, loadflowed_subs, net)
-
-        # Merge results and clean network
-        net_res = merge_networks([network_dict[n]['network'] for n in network_dict.keys()])
-        net = clean_network(net_res, net)
-
-        _,max_v=define_voltage_limits(use_case)
-        check_high_voltage_nodes(net, voltage_threshold=max_v)
+        net=perform_dc_load_flow(net,use_case,PDU_droop_control=True)
 
         bus_voltages = net.res_bus.vm_pu.values
 
@@ -805,11 +796,17 @@ def perform_dc_load_flow_with_droop(net: pp.pandapowerNet,use_case: dict) -> pp.
         bus_voltages_previous = bus_voltages
 
         # Correct the power of each converter/asset according to droop curve
-        droop_correction(net,t,error,tol)
-
-        t = t + 1
-
-
+        #droop_correction(net,t,error,tol)
+        net,SOC_list=droop_correction(net,t,time_step_duration)
+        it = it + 1
+        if it==21:
+            print('out by iteration, error : ',error)
+    c=0
+    for i,_ in net.storage.iterrows():
+        if ('Battery' in net.storage.loc[i,'name']):
+            soc=SOC_list[c]
+            net.storage.loc[i, 'soc_percent'] = soc
+        
     return net
 
 def compute_error(bus_voltages, bus_voltages_previous):
@@ -819,7 +816,96 @@ def compute_error(bus_voltages, bus_voltages_previous):
 
     return max_deviation * 100  # Error in percentage
 
-def droop_correction(net,t,error,tol):
+
+def droop_correction(net,t,time_step_duration):
+    SOC_list=[]
+    attributes=['load','sgen','storage']
+    for attr in attributes:
+        for i,_ in getattr(net,attr).iterrows():
+            voltage_bus,v_asset=get_voltage_bus(i,attr,net)
+            droop_curve=get_droop_curve(i,attr,net)
+            if (attr=='storage') and ('Battery' in getattr(net,attr).loc[i,'name']):
+                p_droop,SOC=interpolate_bess_p_droop(i,attr,net,droop_curve,t,time_step_duration,v_asset)
+                SOC_list.append(SOC)
+            else :
+                p_droop=interpolate_p_droop(i,attr,net,droop_curve,t,v_asset)
+            getattr(net,attr).loc[i,'p_mw']=p_droop
+    return net,SOC_list
+
+
+
+def get_voltage_bus(i,attr,net):
+    asset_bus=getattr(net,attr).loc[i,'bus']
+    converter_connected = net.converter[(net.converter.from_bus == asset_bus) | (net.converter.to_bus == asset_bus)]
+
+    if converter_connected.empty:
+        voltage_bus = asset_bus
+    else :
+        converter_id = converter_connected.index[0]
+        if net.converter.loc[converter_id,'from_bus']==asset_bus:
+            voltage_bus = net.converter.loc[converter_id, 'to_bus']
+        else :
+            voltage_bus = net.converter.loc[converter_id, 'from_bus']
+
+    v_asset = net.res_bus.loc[voltage_bus,'vm_pu'].item()
+    return voltage_bus,v_asset
+
+def get_droop_curve(i,attr,net):
+    asset_bus=getattr(net,attr).loc[i,'bus']
+    converter_connected = net.converter[(net.converter.from_bus == asset_bus) | (net.converter.to_bus == asset_bus)]
+
+    if converter_connected.empty:
+        droop_curve = net.load.loc[i,'droop_curve']
+    else:
+        converter_id = converter_connected.index[0]
+        droop_curve = net.converter.loc[converter_id, 'droop_curve']
+    return droop_curve
+
+def interpolate_p_droop(i,attr,net,droop_curve,t,v_asset):
+    p_droop_curve=droop_curve[:,1]
+    v_droop_curve=droop_curve[:,0]
+    v_droop_curve, p_droop_curve = zip(*sorted(zip(v_droop_curve, p_droop_curve)))
+    v_droop_curve=np.array(v_droop_curve)
+    p_droop_curve=np.array(p_droop_curve)
+
+    p_setpoint=getattr(net,attr).loc[i,'power_profile'][t]*getattr(net,attr).loc[i,'p_nom_mw']
+    
+    p_droop_curve=p_droop_curve*p_setpoint
+
+    p_droop=np.interp(v_asset, v_droop_curve, p_droop_curve)
+    return p_droop
+
+def interpolate_bess_p_droop(i,attr,net,droop_curve,t,duration,v_asset):
+    p_droop_curve=droop_curve[:,1]
+    v_droop_curve=droop_curve[:,0]
+    v_droop_curve, p_droop_curve = zip(*sorted(zip(v_droop_curve, p_droop_curve)))
+    v_droop_curve=np.array(v_droop_curve)
+    p_droop_curve=np.array(p_droop_curve)
+
+    p_setpoint=getattr(net,attr).loc[i,'p_nom_mw']
+    p_droop_curve=p_droop_curve*p_setpoint
+    p_droop=np.interp(v_asset, v_droop_curve, p_droop_curve)
+
+    ini_SOC = getattr(net,attr).loc[i, 'soc_percent'].item()
+    max_ener = getattr(net,attr).loc[i, 'max_e_mwh'].item()
+
+    # SOC computation
+    SOC_change = ((p_droop * net.storage.loc[i,'sn_mva'].item() * duration) / max_ener) * 100            # SOC change (in %) Misses change 1 by period duration of each time step
+    SOC_f = SOC_change + ini_SOC #if is_positive else ini_SOC - SOC_change
+
+    if SOC_f <= 0: 
+        SOC_max_var = ini_SOC
+        p_droop = (SOC_max_var / (100 * duration)) * (max_ener / getattr(net,attr).loc[i,'p_nom_mw'].item()) 
+        SOC_f = ini_SOC + SOC_max_var
+    elif SOC_f > 100: 
+        SOC_max_var = 100 - ini_SOC
+        p_droop = (SOC_max_var / (100 * duration)) * (max_ener / getattr(net,attr).loc[i,'p_nom_mw'].item()) 
+        SOC_f = ini_SOC + SOC_max_var
+
+    return p_droop,SOC_f
+
+
+def droop_correction2(net,t,error,tol):
 
     ### DROOP CONTROL ###
 
@@ -932,85 +1018,157 @@ def droop_correction(net,t,error,tol):
     # Storage (We assume that the only storage available are BESS's and EV's as Excel file available information)
 
     for i,_ in net.storage.iterrows():
+        if 'Battery' in net.storage.loc[i,"name"]:
+            # Verification of the droop curve location (if it is defined in converter or in proper asset) and its setpoint of power
 
-        # Verification of the droop curve location (if it is defined in converter or in proper asset) and its setpoint of power
+            asset_bus = net.storage.loc[i,'bus'].item()             
+            asset_bus_Idx = net.bus.index[net.bus.name == 'Bus ' + str(asset_bus)].astype(int)
 
-        asset_bus = net.storage.loc[i,'bus'].item()             
-        asset_bus_Idx = net.bus.index[net.bus.name == 'Bus ' + str(asset_bus)].astype(int)
+            converter_connected = net.converter[(net.converter.from_bus == asset_bus) | (net.converter.to_bus == asset_bus)]
+            if not converter_connected.empty:
+                converter_id = converter_connected.index[0]
+                if net.converter.loc[converter_id,'from_bus']==asset_bus:
+                    voltage_bus = net.converter.loc[converter_id, 'to_bus']
+                else :
+                    voltage_bus = net.converter.loc[converter_id, 'from_bus']
+            else :
+                voltage_bus = asset_bus
 
-        if net.res_bus.empty or t == 0:
-            v_asset = 1
-            net.storage.loc[i,'sn_mva'] = net.storage.loc[i,'p_mw'].item()  # Nominal Power (Saving the nominal values of power in sn_mva in order to change p_mw of assets)
-        else:
-            v_asset = net.res_bus.loc[asset_bus_Idx,'vm_pu'].item()         # Voltage value (From Pandapower PF)
+            if net.res_bus.empty or t == 0:
+                v_asset = 1.0
+                net.storage.loc[i,'sn_mva'] = net.storage.loc[i,'p_nom_mw']  # Nominal Power (Saving the nominal values of power in sn_mva in order to change p_mw of assets)
+            else:
+                v_asset = net.res_bus.loc[voltage_bus,'vm_pu'].item()         # Voltage value (From Pandapower PF)
+            if 'Battery' in net.storage.loc[i,"name"]:
+                print(voltage_bus,v_asset)
+            p_set = 1.5                                                         # Power Setpoint (From power profile [it is defined 1.5 just to activate droop curve])    
 
-        p_set = 1.5                                                         # Power Setpoint (From power profile [it is defined 1.5 just to activate droop curve])    
+            # Verification of converter connected to the generator 
 
-        # Verification of converter connected to the generator 
-
-        converter_connected = net.converter[(net.converter.from_bus == asset_bus) | (net.converter.to_bus == asset_bus)]
-        
-        if not converter_connected.empty:
-
-            converter_id = converter_connected.index[0]
-            droop_curve = net.converter.loc[converter_id, 'droop_curve']
-
-        else:
-
-            droop_curve = net.storage.loc[i,'droop_curve']
+            converter_connected = net.converter[(net.converter.from_bus == asset_bus) | (net.converter.to_bus == asset_bus)]
             
-        # Defining droop curve variables (voltage points and power points) by unzipping the values of the list of tuples
+            if not converter_connected.empty:
 
-        v_droop_curve = [x for x, y in droop_curve]
-        p_droop_curve = [y for x, y in droop_curve]
-        v_droop_curve.sort()
-        p_droop_curve.sort(reverse=True)
-        
-        # Computation of power point in actualized droop curve
+                converter_id = converter_connected.index[0]
+                droop_curve = net.converter.loc[converter_id, 'droop_curve']
 
-        p_droop = np.interp(v_asset, v_droop_curve, p_droop_curve, left = min(p_droop_curve), right = max(p_droop_curve))
+            else:
 
-        # Verification of the setpoint of power against droop power point
-        
-        p_asset = min(p_droop, p_set) if abs(p_set) < abs(p_droop) else p_droop
+                droop_curve = net.storage.loc[i,'droop_curve']
+                
+            # Defining droop curve variables (voltage points and power points) by unzipping the values of the list of tuples
 
-        # Computation of SOC change (In progress)
+            # v_droop_curve = [x for x, y in droop_curve]
+            # p_droop_curve = [y for x, y in droop_curve]
+            # v_droop_curve.sort()
+            # p_droop_curve.sort(reverse=True)
 
-        # Obtaining the initial SOC
+            p_droop_curve=droop_curve[:,1]
+            v_droop_curve=droop_curve[:,0]
+            
+            # Computation of power point in actualized droop curve
 
-        ini_SOC = net.storage.loc[i, 'soc_percent'].item()
-        SOC_max = 80
-        SOC_min = 20
-        period_duration = 1
-        max_ener = net.storage.loc[i, 'max_e_mwh'].item()
+            p_droop = np.interp(v_asset, v_droop_curve[::-1], p_droop_curve[::-1])
+            
+            # Verification of the setpoint of power against droop power point
+            
+            #p_asset = min(p_droop, p_set) if abs(p_set) < abs(p_droop) else p_droop
+            p_asset=p_droop
+            if 'Battery' in net.storage.loc[i,"name"]:
+                print(net.storage.loc[i,"name"],p_asset,p_droop)
+            # Computation of SOC change (In progress)
 
-        # SOC computation
-        is_positive = p_asset > 0                                                                                   # Pandapower assumes that positive power in storage ats as a load (charging)
-        SOC_change = ((p_asset * net.storage.loc[i,'sn_mva'].item() * period_duration) / max_ener) * 100            # SOC change (in %) Misses change 1 by period duration of each time step
-        SOC_f = SOC_change + ini_SOC if is_positive else ini_SOC - SOC_change
+            # Obtaining the initial SOC
 
-        # Verification of the limits of SOC
+            ini_SOC = net.storage.loc[i, 'soc_percent'].item()
+            SOC_max = 80
+            SOC_min = 20
+            period_duration = 1
+            max_ener = net.storage.loc[i, 'max_e_mwh'].item()
 
-        if SOC_f < SOC_min: 
-        
-            SOC_max_var = ini_SOC - SOC_min
-            p_asset = (SOC_max_var / (100 * period_duration)) * (max_ener / net.storage.loc[i,'sn_mva'].item()) 
-            SOC_f = ini_SOC + SOC_max_var
-        
-        elif SOC_f > SOC_max: 
-        
-            SOC_max_var = SOC_max - ini_SOC
-            p_asset = (SOC_max_var / (100 * period_duration)) * (max_ener / net.storage.loc[i,'sn_mva'].item()) 
-            SOC_f = ini_SOC + SOC_max_var
+            # SOC computation
+            is_positive = p_asset > 0                                                                                   # Pandapower assumes that positive power in storage ats as a load (charging)
+            SOC_change = ((p_asset * net.storage.loc[i,'sn_mva'].item() * period_duration) / max_ener) * 100            # SOC change (in %) Misses change 1 by period duration of each time step
+            SOC_f = SOC_change + ini_SOC #if is_positive else ini_SOC - SOC_change
+            if 'Battery' in net.storage.loc[i,"name"]:
+                print(ini_SOC,SOC_f,SOC_change)
+            # Verification of the limits of SOC
 
-        # Verification of the error, for SOC atualization
+            if SOC_f < SOC_min: 
+            
+                SOC_max_var = ini_SOC - SOC_min
+                p_asset = (SOC_max_var / (100 * period_duration)) * (max_ener / net.storage.loc[i,'sn_mva'].item()) 
+                SOC_f = ini_SOC + SOC_max_var
+            
+            elif SOC_f > SOC_max: 
+            
+                SOC_max_var = SOC_max - ini_SOC
+                p_asset = (SOC_max_var / (100 * period_duration)) * (max_ener / net.storage.loc[i,'sn_mva'].item()) 
+                SOC_f = ini_SOC + SOC_max_var
 
-        if abs(error) < tol:
-        
-            net.storage.loc[i, 'soc_percent'] = SOC_f
+            # Verification of the error, for SOC atualization
 
-        # Imposition of the power in pandapower information for the converter/asset 
+            if abs(error) < tol:
+            
+                net.storage.loc[i, 'soc_percent'] = SOC_f
 
-        net.storage.loc[i,'p_mw'] = p_asset * net.storage.loc[i,'sn_mva'].item() 
+            # Imposition of the power in pandapower information for the converter/asset 
 
+            net.storage.loc[i,'p_mw'] = p_asset * net.storage.loc[i,'sn_mva'].item() 
+            if 'Battery' in net.storage.loc[i,"name"]:
+                print(net.storage.loc[i,'p_mw'] )
+                print('-----------------')
+        else : 
+            # Verification of the droop curve location (if it is defined in converter or in proper asset) and its setpoint of power
+
+            asset_bus = net.storage.loc[i,'bus'].item()             
+            asset_bus_Idx = net.bus.index[net.bus.name == 'Bus ' + str(asset_bus)].astype(int)
+
+            converter_connected = net.converter[(net.converter.from_bus == asset_bus) | (net.converter.to_bus == asset_bus)]
+            if not converter_connected.empty:
+                converter_id = converter_connected.index[0]
+                if net.converter.loc[converter_id,'from_bus']==asset_bus:
+                    voltage_bus = net.converter.loc[converter_id, 'to_bus']
+                else :
+                    voltage_bus = net.converter.loc[converter_id, 'from_bus']
+            else :
+                voltage_bus = asset_bus
+
+            p_set = net.storage.loc[i,'power_profile'][t]                                                        # Power Setpoint (From power profile [it is defined 1.5 just to activate droop curve])    
+
+            # Verification of converter connected to the generator 
+
+            converter_connected = net.converter[(net.converter.from_bus == asset_bus) | (net.converter.to_bus == asset_bus)]
+            
+            if not converter_connected.empty:
+
+                converter_id = converter_connected.index[0]
+                droop_curve = net.converter.loc[converter_id, 'droop_curve']
+
+            else:
+
+                droop_curve = net.storage.loc[i,'droop_curve']
+                
+            # Defining droop curve variables (voltage points and power points) by unzipping the values of the list of tuples
+
+            # v_droop_curve = [x for x, y in droop_curve]
+            # p_droop_curve = [y for x, y in droop_curve]
+            # v_droop_curve.sort()
+            # p_droop_curve.sort(reverse=True)
+
+            p_droop_curve=droop_curve[:,1]
+            v_droop_curve=droop_curve[:,0]
+            
+            # Computation of power point in actualized droop curve
+
+            p_droop = np.interp(v_asset, v_droop_curve[::-1], p_droop_curve[::-1])
+
+            # Verification of the setpoint of power against droop power point
+            
+            p_asset = min(p_droop, p_set) if abs(p_set) < abs(p_droop) else p_droop
+            
+            # Imposition of the power in pandapower information for the converter/asset 
+
+            net.storage.loc[i,'p_mw'] = p_asset * net.storage.loc[i,'power_profile'][t] *  net.storage.loc[i,"p_nom_mw"]
+    print('***********************')
     return net

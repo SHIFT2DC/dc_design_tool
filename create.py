@@ -193,6 +193,7 @@ def _create_buses_and_components(net: pp.pandapowerNet, node_data: pd.DataFrame,
             sgen = pp.create_sgen(
                 net,
                 bus=bus,
+                name = f'PV {bus}',
                 p_mw=row['Maximum power (kW)'] / 1000  # Active power in MW
             )
 
