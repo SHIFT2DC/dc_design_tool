@@ -36,9 +36,9 @@ def process_cable_catalogue(catalogue, cable_info):
     mat = cable_info['Material ']
     isolation = cable_info['Isolation ']
     if 'Cu' in mat:
-        mat ='Cu'
+        mat = 'Cu'
     elif 'Al' in mat:
-        mat ='Al'
+        mat = 'Al'
 
     if 'PVC' in isolation:
         isolation = 'PVC'

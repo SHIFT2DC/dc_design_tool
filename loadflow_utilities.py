@@ -212,7 +212,7 @@ def process_subnetwork(network_id: int, network_dict: Dict, loadflowed_subs: Lis
     update_upstream_network(network_dict, network_id, tmp_net, net)
 
 
-def perform_dc_load_flow(net: pp.pandapowerNet,use_case: dict, PDU_droop_control=False) -> pp.pandapowerNet:
+def perform_dc_load_flow(net: pp.pandapowerNet, use_case: dict, PDU_droop_control=False) -> pp.pandapowerNet:
     """
     Performs DC load flow calculation on the network.
 
@@ -230,8 +230,8 @@ def perform_dc_load_flow(net: pp.pandapowerNet,use_case: dict, PDU_droop_control
     diff_volt=[10]*len(net.converter.loc[net.converter['type'].str.contains('PDU')])
     i=0
     if PDU_droop_control:
-        while ((err > 1e-8) and (sum(abs(np.array(prev_diff_volt)-np.array(diff_volt)))>1e-8)) and (i<100):
-            i+=1
+        while ((err > 1e-8) and (sum(abs(np.array(prev_diff_volt)-np.array(diff_volt))) > 1e-8)) and (i < 100):
+            i += 1
         # Initialize results
             loadflowed_subs = []
             initialize_converter_results(net)
@@ -244,23 +244,22 @@ def perform_dc_load_flow(net: pp.pandapowerNet,use_case: dict, PDU_droop_control
                 for upstream in network_dict[network_id]['direct_upstream_network']:
                     bus = [x[1] for x in network_dict[upstream[0]]['direct_downstream_network']
                         if x[0] == network_id][0]
-                    if net.converter.loc[net.converter['name']==upstream[2],'type'].str.contains('PDU').values[0]:
-                        v_upstream=network_dict[upstream[0]]['network'].res_bus.loc[upstream[1],'vm_pu']
-                        v_downstream=network_dict[network_id]['network'].res_bus.loc[bus,'vm_pu']
-                        err+=abs(v_upstream-v_downstream)
+                    if net.converter.loc[net.converter['name'] == upstream[2],'type'].str.contains('PDU').values[0]:
+                        v_upstream = network_dict[upstream[0]]['network'].res_bus.loc[upstream[1],'vm_pu']
+                        v_downstream = network_dict[network_id]['network'].res_bus.loc[bus,'vm_pu']
+                        err += abs(v_upstream-v_downstream)
                         diff_volt.append(v_downstream)
     else:
         loadflowed_subs = []
         initialize_converter_results(net)
         # Process subnetworks sequentially
         process_all_subnetworks(network_dict, loadflowed_subs, net)
-                
 
     # Merge results and clean network
     net_res = merge_networks([network_dict[n]['network'] for n in network_dict.keys()])
     net = clean_network(net_res, net)
 
-    _,max_v=define_voltage_limits(use_case)
+    _, max_v = define_voltage_limits(use_case)
     check_high_voltage_nodes(net, voltage_threshold=max_v)
 
     return net
@@ -635,7 +634,9 @@ def check_downstream_line_size(subnet: pp.pandapowerNet, line_id: int, cable_cat
     pp.runpp(subnet)
     return optimal
 
+
 import warnings
+
 
 def check_high_voltage_nodes(net, voltage_threshold=1.1):
     """
@@ -677,52 +678,54 @@ def check_high_voltage_nodes(net, voltage_threshold=1.1):
                 stacklevel=2
             )
 
-def update_network(net,t):
-    for i,_ in net.load.iterrows():
-        if not np.isnan(net.load.loc[i,'power_profile']).any():
-            net.load.loc[i,'p_mw']=net.load.loc[i,'power_profile'][t]*net.load.loc[i,'p_nom_mw']
 
-    for i,_ in net.sgen.iterrows():
-        if not np.isnan(net.sgen.loc[i,'power_profile']).any():
-            net.sgen.loc[i,'p_mw']=net.sgen.loc[i,'power_profile'][t]*net.sgen.loc[i,'p_nom_mw']
+def update_network(net, t):
+    for i, _ in net.load.iterrows():
+        if not np.isnan(net.load.loc[i, 'power_profile']).any():
+            net.load.loc[i, 'p_mw'] = net.load.loc[i, 'power_profile'][t]*net.load.loc[i, 'p_nom_mw']
 
-    for i,_ in net.storage.iterrows():
-        if not np.isnan(net.storage.loc[i,'power_profile']).any():
-            net.storage.loc[i,'p_mw']=net.storage.loc[i,'power_profile'][t]*net.storage.loc[i,'p_nom_mw']
+    for i, _ in net.sgen.iterrows():
+        if not np.isnan(net.sgen.loc[i, 'power_profile']).any():
+            net.sgen.loc[i, 'p_mw'] = net.sgen.loc[i, 'power_profile'][t]*net.sgen.loc[i, 'p_nom_mw']
+
+    for i, _ in net.storage.iterrows():
+        if not np.isnan(net.storage.loc[i, 'power_profile']).any():
+            net.storage.loc[i, 'p_mw'] = net.storage.loc[i, 'power_profile'][t]*net.storage.loc[i, 'p_nom_mw']
 
 
 def format_result_dataframe(df,net):
     for i,row in net.bus.iterrows():
         df[f'node {i} : v_pu']=np.nan
     for i,row in net.line.iterrows():
-        df[f'line {row.from_bus} - {row.to_bus} : i_ka']=np.nan
-        df[f'line {row.from_bus} - {row.to_bus} : loading']=np.nan
-        df[f'line {row.from_bus} - {row.to_bus} : pl_mw']=np.nan
+        df[f'line {row.from_bus} - {row.to_bus} : i_ka'] = np.nan
+        df[f'line {row.from_bus} - {row.to_bus} : loading'] = np.nan
+        df[f'line {row.from_bus} - {row.to_bus} : pl_mw'] = np.nan
     for i,row in net.load.iterrows():
-        df[f'load {row["name"]} : p_mw']=np.nan
+        df[f'load {row["name"]} : p_mw'] = np.nan
     for i,row in net.sgen.iterrows():
-        df[f'sgen {row["name"]} : p_mw']=np.nan    
+        df[f'sgen {row["name"]} : p_mw'] = np.nan
     for i,row in net.storage.iterrows():
         df[f'storage {row["name"]} : p_mw']=np.nan
         if "Battery" in row["name"]:
             df[f'storage {row["name"]} : SOC']=np.nan
     for i,row in net.converter.iterrows():
-        df[f'{row["name"]} : p_mw']=np.nan
-        df[f'{row["name"]} : loading']=np.nan
-        df[f'{row["name"]} : pl_mw']=np.nan
+        df[f'{row["name"]} : p_mw'] = np.nan
+        df[f'{row["name"]} : loading'] = np.nan
+        df[f'{row["name"]} : pl_mw'] = np.nan
     return df
 
-def fill_result_dataframe(df,t,net):
+
+def fill_result_dataframe(df, t, net):
     for i,row in net.bus.iterrows():
         df.loc[t,f'node {i} : v_pu']=net.res_bus.loc[i,'vm_pu']
     for i,row in net.line.iterrows():
-        df.loc[t,f'line {row.from_bus} - {row.to_bus} : i_ka']=net.res_line.loc[i,'i_ka']
-        df.loc[t,f'line {row.from_bus} - {row.to_bus} : loading']=net.res_line.loc[i,'loading_percent']
-        df.loc[t,f'line {row.from_bus} - {row.to_bus} : pl_mw']=net.res_line.loc[i,'pl_mw']
+        df.loc[t, f'line {row.from_bus} - {row.to_bus} : i_ka'] = net.res_line.loc[i,'i_ka']
+        df.loc[t, f'line {row.from_bus} - {row.to_bus} : loading'] = net.res_line.loc[i,'loading_percent']
+        df.loc[t, f'line {row.from_bus} - {row.to_bus} : pl_mw'] = net.res_line.loc[i,'pl_mw']
     for i,row in net.load.iterrows():
-        df.loc[t,f'load {row["name"]} : p_mw']=net.res_load.loc[i,'p_mw']
+        df.loc[t, f'load {row["name"]} : p_mw'] = net.res_load.loc[i,'p_mw']
     for i,row in net.sgen.iterrows():
-        df.loc[t,f'sgen {row["name"]} : p_mw']=net.res_sgen.loc[i,'p_mw']   
+        df.loc[t, f'sgen {row["name"]} : p_mw'] = net.res_sgen.loc[i,'p_mw']
     for i,row in net.storage.iterrows():
         df.loc[t,f'storage {row["name"]} : p_mw']=net.res_storage.loc[i,'p_mw']
         if "Battery" in row["name"]:
@@ -735,10 +738,10 @@ def fill_result_dataframe(df,t,net):
 
 def perform_timestep_dc_load_flow(net,use_case):
 
-    timestep=use_case['Parameters for annual simulations']['Simulation time step (mins)']
-    timelaps=use_case['Parameters for annual simulations']['Simulation period (days)']
-    number_of_timestep=int(timelaps*24*60/timestep)
-    result=pd.DataFrame(index=range(number_of_timestep))
+    timestep = use_case['Parameters for annual simulations']['Simulation time step (mins)']
+    timelaps = use_case['Parameters for annual simulations']['Simulation period (days)']
+    number_of_timestep = int(timelaps*24*60/timestep)
+    result = pd.DataFrame(index=range(number_of_timestep))
 
     for t in tqdm(range(number_of_timestep)):
         update_network(net,t)
@@ -808,6 +811,7 @@ def perform_dc_load_flow_with_droop(net: pp.pandapowerNet,use_case: dict,t,time_
             net.storage.loc[i, 'soc_percent'] = soc
         
     return net
+
 
 def compute_error(bus_voltages, bus_voltages_previous):
     

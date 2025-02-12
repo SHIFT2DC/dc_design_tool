@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+
 def add_noise_to_profile(profile: list, noise_std: float = 0.05) -> np.ndarray:
     """
     Ajoute du bruit gaussien à un profil de consommation.
@@ -25,6 +26,7 @@ def add_noise_to_profile(profile: list, noise_std: float = 0.05) -> np.ndarray:
     noisy_profile = np.clip(noisy_profile, 0, None)
     
     return noisy_profile
+
 
 def generate_computer_profiles(N: int, aggregated_profile: list) -> np.ndarray:
     """
@@ -51,6 +53,7 @@ def generate_computer_profiles(N: int, aggregated_profile: list) -> np.ndarray:
         individual_profiles[:, hour] = aggregated_profile[hour] * weights
     
     return individual_profiles
+
 
 def plot_profiles(individual_profiles: np.ndarray, aggregated_profile: list, noisy_profile: np.ndarray = None) -> None:
     """
@@ -81,8 +84,6 @@ def plot_profiles(individual_profiles: np.ndarray, aggregated_profile: list, noi
     plt.legend()
     plt.grid()
     plt.show()
-
-
 
 # if __name__ == "__main__":
 #     # Exemple d'utilisation
@@ -119,9 +120,9 @@ def plot_profiles(individual_profiles: np.ndarray, aggregated_profile: list, noi
 #     plt.show()
 
 
-
 import numpy as np
 from datetime import datetime, timedelta, date as date_obj
+
 
 def add_noise_to_profile(profile: list, noise_std: float = 0.05) -> np.ndarray:
     """
@@ -131,6 +132,7 @@ def add_noise_to_profile(profile: list, noise_std: float = 0.05) -> np.ndarray:
     noise = np.random.normal(0, noise_std, profile.shape)
     noisy_profile = profile + noise
     return np.clip(noisy_profile, 0, None)
+
 
 def get_season(date: date_obj) -> str:
     """
@@ -146,6 +148,7 @@ def get_season(date: date_obj) -> str:
     else:
         return 'winter'
 
+
 def get_day_type(date: date_obj, holidays: set) -> str:
     """
     Détermine si la date est un jour de semaine, un week-end ou des vacances.
@@ -157,6 +160,7 @@ def get_day_type(date: date_obj, holidays: set) -> str:
     else:
         return 'workday'
 
+
 def interpolate_profile(base_profile: list, time_step_min: int) -> np.ndarray:
     """
     Interpole un profil de 24 heures à une résolution temporelle plus fine.
@@ -165,6 +169,7 @@ def interpolate_profile(base_profile: list, time_step_min: int) -> np.ndarray:
     step_per_hour = 60 // time_step_min
     x_new = np.linspace(0, 23, 24 * step_per_hour)
     return np.interp(x_new, hours, base_profile)
+
 
 def generate_load_profile(
     num_days: int,
@@ -249,6 +254,8 @@ def generate_load_profile(
     return np.array(timestamps), np.array(load_values), np.array(timestamp_indices)
 
 # Exemple d'utilisation
+
+
 if __name__ == "__main__":
     # Exemple de vacances
     holidays = [date_obj(2018, 12, 25)]  # Noël 2018
