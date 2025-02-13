@@ -118,7 +118,7 @@ def _create_buses_and_components(net: pp.pandapowerNet, node_data: pd.DataFrame,
                 net.load.at[l, 'default_power_profile'] = None
                 net.load.at[l, 'power_profile'] = user_profile_data[f'Profile of node {bus}'].values
 
-            else :
+            else:
                 if 'power_profile' not in net.load.columns:
                     net.load['power_profile'] = np.nan
                     net.load['power_profile'] = net.load['power_profile'].astype('object')
@@ -130,7 +130,7 @@ def _create_buses_and_components(net: pp.pandapowerNet, node_data: pd.DataFrame,
                 net.load.at[l, 'power_profile'] = None
 
         elif component_type == 'ev':
-            ev =pp.create_storage(
+            ev = pp.create_storage(
                 net,
                 name='EV ' + str(bus),
                 bus=bus,
@@ -189,7 +189,7 @@ def _create_buses_and_components(net: pp.pandapowerNet, node_data: pd.DataFrame,
             sgen = pp.create_sgen(
                 net,
                 bus=bus,
-                name = f'PV {bus}',
+                name=f'PV {bus}',
                 p_mw=row['Maximum power (kW)'] / 1000  # Active power in MW
             )
 
@@ -209,7 +209,7 @@ def _create_buses_and_components(net: pp.pandapowerNet, node_data: pd.DataFrame,
                 net.sgen.at[sgen, 'default_power_profile'] = None
                 net.sgen.at[sgen, 'power_profile'] = user_profile_data[f'Profile of node {bus}'].values
 
-            else :
+            else:
                 if 'power_profile' not in net.sgen.columns:
                     net.sgen['power_profile'] = np.nan
                     net.sgen['power_profile'] = net.sgen['power_profile'].astype('object')
