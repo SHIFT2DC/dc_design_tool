@@ -15,7 +15,7 @@ path_converter_catalogue = "Converters_Library.xlsx"
 net, cable_catalogue, use_case = create_DC_network(path, path_cable_catalogue, path_converter_catalogue)
 
 net = perform_comprehensive_sizing(net, cable_catalogue, use_case)
-scenario1, scenario2, scenario3 = validate_network_performance(net, use_case)
+#scenario1, scenario2, scenario3 = validate_network_performance(net, use_case)
 
 #net = perform_dc_load_flow(net, use_case)
 

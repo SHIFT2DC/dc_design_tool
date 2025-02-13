@@ -750,22 +750,9 @@ def perform_timestep_dc_load_flow(net,use_case):
         net=perform_dc_load_flow_with_droop(net,use_case,t,timestep/60)
         result=fill_result_dataframe(result,t,net)
     
-
-    result[[x for x in result.columns if 'load ' in x]].plot()
-
     return net,result
     
 
-
-
-
-    
-
-
-
-
-
-#helper
  
 def perform_dc_load_flow_with_droop(net: pp.pandapowerNet,use_case: dict,t,time_step_duration) -> pp.pandapowerNet:
     """
@@ -782,42 +769,46 @@ def perform_dc_load_flow_with_droop(net: pp.pandapowerNet,use_case: dict,t,time_
     error = 1
     tol = 1e-2
     it = 0
+    max_it=200
+    net=perform_dc_load_flow(net,use_case,PDU_droop_control=True)
+    bus_voltages_previous = np.zeros(net.res_bus.vm_pu.values.shape)
+    bus_voltages = np.zeros(net.res_bus.vm_pu.values.shape)
 
-    while (abs(error) > tol) and (it<=20):
+    while (abs(error) > tol) and (it<max_it):
+
+        bus_voltages_previous = bus_voltages
+
+        net,SOC_list=droop_correction(net,t,time_step_duration)
 
         net=perform_dc_load_flow(net,use_case,PDU_droop_control=True)
 
         bus_voltages = net.res_bus.vm_pu.values
-
-        if error == 1:
-            bus_voltages_previous = np.zeros(bus_voltages.shape)
-
         # Computes error
-        error = compute_error(bus_voltages, bus_voltages_previous)
-
-        # Save the previous results to compare with the next iteration
-        bus_voltages_previous = bus_voltages
-
-        # Correct the power of each converter/asset according to droop curve
-        #droop_correction(net,t,error,tol)
-        net,SOC_list=droop_correction(net,t,time_step_duration)
+        error = compute_error(bus_voltages, bus_voltages_previous,net)
+        print('it : ',it,' error value : ',error)
         it = it + 1
-        if it==21:
-            print('out by iteration, error : ',error)
+        if it==max_it:
+            print('\nout by iteration\n error : ',error)
     c=0
     for i,_ in net.storage.iterrows():
         if ('Battery' in net.storage.loc[i,'name']):
             soc=SOC_list[c]
+            print(SOC_list)
+            print(soc)
             net.storage.loc[i, 'soc_percent'] = soc
+            c+=1
         
     return net
 
 
-def compute_error(bus_voltages, bus_voltages_previous):
+def compute_error(bus_voltages, bus_voltages_previous,net):
     
     voltage_deviation = abs(bus_voltages - bus_voltages_previous) / bus_voltages
     max_deviation = max(voltage_deviation)
-
+    #print(pd.DataFrame(data=np.vstack((bus_voltages,bus_voltages_previous,voltage_deviation*100)).T,index=net.res_bus.index,columns=['v_bus','prev_v_bus','dev']))
+    # print('load  :' ,net.load['p_mw'])
+    # print('sgen  :' ,net.sgen['p_mw'])
+    print('storage  :\n' ,net.storage['p_mw'])
     return max_deviation * 100  # Error in percentage
 
 
@@ -894,16 +885,16 @@ def interpolate_bess_p_droop(i,attr,net,droop_curve,t,duration,v_asset):
     max_ener = getattr(net,attr).loc[i, 'max_e_mwh'].item()
 
     # SOC computation
-    SOC_change = ((p_droop * net.storage.loc[i,'sn_mva'].item() * duration) / max_ener) * 100            # SOC change (in %) Misses change 1 by period duration of each time step
+    SOC_change = ((p_droop * duration) / max_ener) * 100            # SOC change (in %) Misses change 1 by period duration of each time step
     SOC_f = SOC_change + ini_SOC #if is_positive else ini_SOC - SOC_change
 
     if SOC_f <= 0: 
         SOC_max_var = ini_SOC
-        p_droop = (SOC_max_var / (100 * duration)) * (max_ener / getattr(net,attr).loc[i,'p_nom_mw'].item()) 
+        p_droop = (SOC_max_var / (100 * duration)) * (max_ener) 
         SOC_f = ini_SOC + SOC_max_var
     elif SOC_f > 100: 
         SOC_max_var = 100 - ini_SOC
-        p_droop = (SOC_max_var / (100 * duration)) * (max_ener / getattr(net,attr).loc[i,'p_nom_mw'].item()) 
+        p_droop = (SOC_max_var / (100 * duration)) * (max_ener) 
         SOC_f = ini_SOC + SOC_max_var
 
     return p_droop,SOC_f
