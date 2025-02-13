@@ -682,15 +682,26 @@ def check_high_voltage_nodes(net, voltage_threshold=1.1):
 def update_network(net, t):
     for i, _ in net.load.iterrows():
         if not np.isnan(net.load.loc[i, 'power_profile']).any():
-            net.load.loc[i, 'p_mw'] = net.load.loc[i, 'power_profile'][t]*net.load.loc[i, 'p_nom_mw']
-
+            if t<len(net.load.loc[i, 'power_profile']):
+                net.load.loc[i, 'p_mw'] = net.load.loc[i, 'power_profile'][t]*net.load.loc[i, 'p_nom_mw']
+            else :
+                print('WARNING INCORRECT Number of timestep in User-define profile')
+                net.load.loc[i, 'p_mw'] = net.load.loc[i, 'power_profile'][-1]*net.load.loc[i, 'p_nom_mw']
+    
     for i, _ in net.sgen.iterrows():
         if not np.isnan(net.sgen.loc[i, 'power_profile']).any():
-            net.sgen.loc[i, 'p_mw'] = net.sgen.loc[i, 'power_profile'][t]*net.sgen.loc[i, 'p_nom_mw']
-
+            if t<len(net.sgen.loc[i, 'power_profile']):
+                net.sgen.loc[i, 'p_mw'] = net.sgen.loc[i, 'power_profile'][t]*net.sgen.loc[i, 'p_nom_mw']
+            else :
+                print('WARNING INCORRECT Number of timestep in User-define profile')
+                net.sgen.loc[i, 'p_mw'] = net.sgen.loc[i, 'power_profile'][-1]*net.sgen.loc[i, 'p_nom_mw']
     for i, _ in net.storage.iterrows():
         if not np.isnan(net.storage.loc[i, 'power_profile']).any():
-            net.storage.loc[i, 'p_mw'] = net.storage.loc[i, 'power_profile'][t]*net.storage.loc[i, 'p_nom_mw']
+            if t<len(net.storage.loc[i, 'power_profile']):
+                net.storage.loc[i, 'p_mw'] = net.storage.loc[i, 'power_profile'][t]*net.storage.loc[i, 'p_nom_mw']
+            else :
+                print('WARNING INCORRECT Number of timestep in User-define profile')
+                net.storage.loc[i, 'p_mw'] = net.storage.loc[i, 'power_profile'][-1]*net.storage.loc[i, 'p_nom_mw']
 
 
 def format_result_dataframe(df,net):
