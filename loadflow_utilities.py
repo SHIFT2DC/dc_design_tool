@@ -850,10 +850,16 @@ def get_droop_curve(i,attr,net):
     converter_connected = net.converter[(net.converter.from_bus == asset_bus) | (net.converter.to_bus == asset_bus)]
 
     if converter_connected.empty:
-        droop_curve = net.load.loc[i,'droop_curve']
+        if np.isnan(net.load.loc[i,'droop_curve']).any():
+            droop_curve=np.array([[1.5,1],[1.1,1],[1,1],[1,1],[0.99,1],[0.95,1]])
+        else:
+            droop_curve = net.load.loc[i,'droop_curve']
     else:
         converter_id = converter_connected.index[0]
-        droop_curve = net.converter.loc[converter_id, 'droop_curve']
+        if np.isnan(net.converter.loc[converter_id, 'droop_curve']).any():
+            droop_curve=np.array([[1.5,1],[1.1,1],[1,1],[1,1],[0.99,1],[0.95,1]])
+        else:
+            droop_curve = net.converter.loc[converter_id, 'droop_curve']
     return droop_curve
 
 def interpolate_p_droop(i,attr,net,droop_curve,t,v_asset):
