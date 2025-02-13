@@ -473,11 +473,14 @@ def _calculate_droop_curve(row: pd.Series, converter_default: pd.DataFrame) -> n
     Returns:
         np.ndarray: Droop curve as a numpy array.
     """
-    if 'user-defined' in row["Droop curve"]:
-        return np.array(literal_eval(row['droop_curve']))
-    else:
-        str_dc = converter_default.loc[
-            converter_default['Converter type'] == row['type'],
-            'Default Droop curve'
-        ].values[0]
-        return np.array(literal_eval('[' + str_dc.replace(';', ',') + ']'))
+    if 'droop control' in row["Voltage control mode"]:
+        if 'user-defined' in row["Droop curve"]:
+            return np.array(literal_eval(row['droop_curve']))
+        else:
+            str_dc = converter_default.loc[
+                converter_default['Converter type'] == row['type'],
+                'Default Droop curve'
+            ].values[0]
+            return np.array(literal_eval('[' + str_dc.replace(';', ',') + ']'))
+    else :
+        return
