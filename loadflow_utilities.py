@@ -205,6 +205,10 @@ def process_subnetwork(network_id: int, network_dict: Dict, loadflowed_subs: Lis
 
     # Run power flow
     pp.runpp(tmp_net)
+    # print(tmp_net.ext_grid)
+    # if len(tmp_net.bus)==1:
+    #     for i,row in tmp_net.res_bus.iterrows():
+    #         row['p_mw']=tmp_net.res_ext_grid.loc[0,'p_mw']
     network_dict[network_id]['network'] = tmp_net
     loadflowed_subs.append(network_id)
 
@@ -758,7 +762,7 @@ def perform_timestep_dc_load_flow(net,use_case):
     for t in tqdm(range(number_of_timestep)):
         update_network(net, t)
 
-        # net=perform_dc_load_flow(net,use_case)
+        net=perform_dc_load_flow(net,use_case,PDU_droop_control=True)
         net = perform_dc_load_flow_with_droop(net, use_case, t, timestep/60)
         result = fill_result_dataframe(result, t, net)
     
@@ -785,7 +789,7 @@ def perform_dc_load_flow_with_droop(net: pp.pandapowerNet, use_case: dict, t, ti
     bus_voltages_previous = np.zeros(net.res_bus.vm_pu.values.shape)
     bus_voltages = np.zeros(net.res_bus.vm_pu.values.shape)
 
-    while (abs(error) > tol) and (it < max_it):
+    while (abs(error) > tol) and (it < 5):
 
         bus_voltages_previous = bus_voltages
 
