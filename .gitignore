@@ -163,3 +163,4 @@ cython_debug/
 
 *.html
 ~$grid_data_input_file_building_demo.xlsx
+grid_data_input_file_WIP_v1.xlsx
