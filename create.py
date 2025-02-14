@@ -5,7 +5,7 @@ import numpy as np
 from read_cable_catalogue import read_cable_catalogue, process_cable_catalogue
 from reading_utilities import read_UC_Definition
 from topology_utilities import separate_subnetworks, sorting_network, merge_networks
-
+from load_profile_utilities import generate_load_profile
 
 def create_DC_network(path: str, path_cable_catalogue: str, path_converter_catalogue: str) -> tuple:
     """
@@ -48,7 +48,7 @@ def create_DC_network(path: str, path_cable_catalogue: str, path_converter_catal
     ]
 
     # Create buses and components
-    _create_buses_and_components(net, node_data, converter_default, user_profile_data, default_assets_profile)
+    _create_buses_and_components(net, node_data, converter_default, user_profile_data, default_assets_profile, Uc)
     
     # Create converters
     _create_converters(net, converter_data, converter_default, converter_catalogue)
@@ -67,7 +67,7 @@ def create_DC_network(path: str, path_cable_catalogue: str, path_converter_catal
     return net, cable_catalogue, Uc
 
 
-def _create_buses_and_components(net: pp.pandapowerNet, node_data: pd.DataFrame, converter_default, user_profile_data, default_assets_profile) -> None:
+def _create_buses_and_components(net: pp.pandapowerNet, node_data: pd.DataFrame, converter_default, user_profile_data, default_assets_profile, use_case) -> None:
     """
     Creates buses and components (loads, storages, etc.) in the network.
 
@@ -75,6 +75,9 @@ def _create_buses_and_components(net: pp.pandapowerNet, node_data: pd.DataFrame,
         net (pp.pandapowerNet): The pandapower network.
         node_data (pd.DataFrame): DataFrame containing node data.
     """
+    timestep = use_case['Parameters for annual simulations']['Simulation time step (mins)']
+    timelaps = use_case['Parameters for annual simulations']['Simulation period (days)']
+
     for _, row in node_data.iterrows():
         bus = pp.create_bus(
             net,
@@ -127,7 +130,11 @@ def _create_buses_and_components(net: pp.pandapowerNet, node_data: pd.DataFrame,
                     net.load['default_power_profile'] = net.load['default_power_profile'].astype('object')
 
                 net.load.at[l, 'default_power_profile'] = default_assets_profile[row['Asset profile type']].values
-                net.load.at[l, 'power_profile'] = None
+                _,load_profile,_=generate_load_profile(timelaps,timestep,net.load.at[l, 'default_power_profile'],noise_std=0.1,
+                                                                        summer_coeficient=0.95,winter_coeficient=1.1,
+                                                                        holiday_coefficient=1/5,weekend_coeficent=1/20,
+                                                                        day_varation_sigma=0.1)
+                net.load.at[l, 'power_profile'] = load_profile
 
         elif component_type == 'ev':
             ev = pp.create_storage(
@@ -164,7 +171,11 @@ def _create_buses_and_components(net: pp.pandapowerNet, node_data: pd.DataFrame,
                     net.storage['default_power_profile'] = net.storage['default_power_profile'].astype('object')
 
                 net.storage.at[ev, 'default_power_profile'] = default_assets_profile[row['Asset profile type']].values
-                net.storage.at[ev, 'power_profile'] = None
+                _,load_profile,_=generate_load_profile(timelaps,timestep,net.storage.at[ev, 'default_power_profile'],noise_std=0.1,
+                                                                        summer_coeficient=0.9,winter_coeficient=1.2,
+                                                                        holiday_coefficient=1/5,weekend_coeficent=1/20,
+                                                                        day_varation_sigma=0.1)
+                net.storage.at[ev, 'power_profile'] = load_profile
 
         elif component_type == 'storage':
             if not np.isnan(row['Maximum power (kW)']):
@@ -218,7 +229,11 @@ def _create_buses_and_components(net: pp.pandapowerNet, node_data: pd.DataFrame,
                     net.sgen['default_power_profile'] = net.sgen['default_power_profile'].astype('object')
 
                 net.sgen.at[sgen, 'default_power_profile'] = default_assets_profile[row['Asset profile type']].values
-                net.sgen.at[sgen, 'power_profile'] = None
+                _,load_profile,_=generate_load_profile(timelaps,timestep,net.sgen.at[sgen, 'default_power_profile'],noise_std=0.1,
+                                                                        summer_coeficient=1,winter_coeficient=0.4,
+                                                                        holiday_coefficient=1,weekend_coeficent=1,
+                                                                        day_varation_sigma=0.4)
+                net.sgen.at[sgen, 'power_profile'] = load_profile
 
         # Create linked converter bus if needed
         if not np.isnan(row['Node number for directly linked converter']):

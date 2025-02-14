@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-
+import random
 
 def add_noise_to_profile(profile: list, noise_std: float = 0.05) -> np.ndarray:
     """
@@ -174,9 +174,13 @@ def interpolate_profile(base_profile: list, time_step_min: int) -> np.ndarray:
 def generate_load_profile(
     num_days: int,
     time_step_min: int = 60,
-    base_profiles: dict = None,
-    holidays: list = None,
-    noise_std: float = 0.05
+    base_profile: list = None,
+    noise_std: float = 0.05,
+    summer_coeficient=0.8,
+    winter_coeficient=1.2,
+    holiday_coefficient=1/5,
+    weekend_coeficent=1/20,
+    day_varation_sigma=0.1
 ) -> tuple:
     """
     Génère un profil de charge électrique sur une période donnée.
@@ -197,38 +201,35 @@ def generate_load_profile(
     # Date de début fixée au 01/01/2018
     start_date = date_obj(2018, 1, 1)
     end_date = start_date + timedelta(days=num_days - 1)
-    
+    holidays =[date_obj(2018, 7, x) for x in range(27,32)]+[date_obj(2018, 8, x) for x in range(1,20)]+[date_obj(2018, 12, x) for x in range(14,32)]
+
     dates = [start_date + timedelta(days=i) for i in range(num_days)]
     
     timestamps = []
     load_values = []
     timestamp_indices = []
     current_index = 0
-    
-    if base_profiles is None:
-        # Profils de base par défaut (à personnaliser selon vos besoins)
-        office_profile = [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.3, 0.5, 0.7, 0.8, 0.8, 
-                          0.8, 0.3, 0.3, 0.8, 0.8, 0.8, 0.7, 0.6, 0.2, 0.1, 0.1, 0.1]
-        weekend_profile = [0.05] * 24
-        vacation_profile = [0.08] * 24
-        
-        base_profiles = {
-            'winter': {'workday': office_profile, 'weekend': weekend_profile, 'vacation': vacation_profile},
-            'spring': {'workday': office_profile, 'weekend': weekend_profile, 'vacation': vacation_profile},
-            'summer': {'workday': office_profile, 'weekend': weekend_profile, 'vacation': vacation_profile},
-            'autumn': {'workday': office_profile, 'weekend': weekend_profile, 'vacation': vacation_profile}
-        }
-    
+
     holidays = set(holidays) if holidays else set()
     
+    base_profile=np.array(base_profile)
+
     for date in dates:
+        s=np.random.normal(1, day_varation_sigma, 1)[0]
+        day_profile=base_profile*s
         season = get_season(date)
         day_type = get_day_type(date, holidays)
         
-        try:
-            base_profile = base_profiles[season][day_type]
-        except KeyError as e:
-            raise ValueError(f"Profil manquant pour {season} et {day_type}") from e
+        if season == "summer":
+            day_profile=day_profile*summer_coeficient
+        elif season   == "winter":
+            day_profile=day_profile*winter_coeficient
+
+        if day_type=='vacation':
+            day_profile=day_profile*holiday_coefficient
+        if day_type=='weekend':
+            day_profile=day_profile*weekend_coeficent
+
         
         # Générer les timestamps pour la journée
         steps_per_day = 24 * 60 // time_step_min
@@ -239,11 +240,12 @@ def generate_load_profile(
         
         # Générer les valeurs de charge
         if time_step_min == 60:
-            daily_load = add_noise_to_profile(base_profile, noise_std)
+            daily_load = add_noise_to_profile(day_profile, noise_std)
+            daily_load = np.clip(daily_load, 0, 1)
         else:
-            interpolated = interpolate_profile(base_profile, time_step_min)
+            interpolated = interpolate_profile(day_profile, time_step_min)
             noise = np.random.normal(0, noise_std, interpolated.shape)
-            daily_load = np.clip(interpolated + noise, 0, None)
+            daily_load = np.clip(interpolated + noise, 0, 1)
         
         # Ajouter les timestamps, les valeurs de charge et les indices
         timestamps.extend(daily_timestamps)
@@ -257,15 +259,16 @@ def generate_load_profile(
 
 
 if __name__ == "__main__":
+    office_profile = [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.15, 0.3, 0.4, 0.5, 0.5, 0.5, 0.15, 0.15, 0.5, 0.5, 0.5, 0.35, 0.3, 0.15, 0.1, 0.1, 0.1]
     # Exemple de vacances
-    holidays = [date_obj(2018, 12, 25)]  # Noël 2018
-    
+    holidays =[date_obj(2018, 7, x) for x in range(27,32)]+[date_obj(2018, 8, x) for x in range(1,20)]+[date_obj(2018, 12, x) for x in range(14,32)]
     # Générer un profil pour 10 jours avec un pas de temps de 30 minutes
     timestamps, load, indices = generate_load_profile(
-        num_days=1,
+        num_days=365,
         time_step_min=5,
+        base_profile=office_profile,
         holidays=holidays,
-        noise_std=0.05
+        noise_std=0.01
     )
     
     # Affichage des 10 premiers éléments pour vérification
