@@ -497,5 +497,5 @@ def _calculate_droop_curve(row: pd.Series, converter_default: pd.DataFrame) -> n
                 'Default Droop curve'
             ].values[0]
             return np.array(literal_eval('[' + str_dc.replace(';', ',') + ']'))
-    else :
+    else:
         return
