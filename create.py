@@ -7,6 +7,7 @@ from reading_utilities import read_UC_Definition
 from topology_utilities import separate_subnetworks, sorting_network, merge_networks
 from load_profile_utilities import generate_load_profile
 
+
 def create_DC_network(path: str, path_cable_catalogue: str, path_converter_catalogue: str) -> tuple:
     """
     Creates a DC network from the provided Excel file and cable catalogue.
@@ -171,10 +172,11 @@ def _create_buses_and_components(net: pp.pandapowerNet, node_data: pd.DataFrame,
                     net.storage['default_power_profile'] = net.storage['default_power_profile'].astype('object')
 
                 net.storage.at[ev, 'default_power_profile'] = default_assets_profile[row['Asset profile type']].values
-                _,load_profile,_=generate_load_profile(timelaps,timestep,net.storage.at[ev, 'default_power_profile'],noise_std=0.1,
-                                                                        summer_coeficient=0.9,winter_coeficient=1.2,
-                                                                        holiday_coefficient=1/5,weekend_coeficent=1/20,
-                                                                        day_varation_sigma=0.1)
+                _, load_profile, _ = generate_load_profile(timelaps, timestep,
+                                                           net.storage.at[ev, 'default_power_profile'],
+                                                           noise_std=0.1, summer_coeficient=0.9, winter_coeficient=1.2,
+                                                           holiday_coefficient=1/5, weekend_coeficent=1/20,
+                                                           day_varation_sigma=0.1)
                 net.storage.at[ev, 'power_profile'] = load_profile
 
         elif component_type == 'storage':
@@ -229,10 +231,11 @@ def _create_buses_and_components(net: pp.pandapowerNet, node_data: pd.DataFrame,
                     net.sgen['default_power_profile'] = net.sgen['default_power_profile'].astype('object')
 
                 net.sgen.at[sgen, 'default_power_profile'] = default_assets_profile[row['Asset profile type']].values
-                _,load_profile,_=generate_load_profile(timelaps,timestep,net.sgen.at[sgen, 'default_power_profile'],noise_std=0.1,
-                                                                        summer_coeficient=1,winter_coeficient=0.4,
-                                                                        holiday_coefficient=1,weekend_coeficent=1,
-                                                                        day_varation_sigma=0.4)
+                _, load_profile, _ = generate_load_profile(timelaps, timestep,
+                                                           net.sgen.at[sgen, 'default_power_profile'],
+                                                           noise_std=0.1, summer_coeficient=1, winter_coeficient=0.4,
+                                                           holiday_coefficient=1, weekend_coeficent=1,
+                                                           day_varation_sigma=0.4)
                 net.sgen.at[sgen, 'power_profile'] = load_profile
 
         # Create linked converter bus if needed
@@ -384,7 +387,7 @@ def _add_converter(net: pp.pandapowerNet, row: pd.Series, converter_default: pd.
         "droop_curve": droop_curve,
         'converter_catalogue': None,
         'conv_rank': None,
-        'stand_by_loss' : 0
+        'stand_by_loss': 0
     }
     net.converter.loc[len(net.converter)] = new_row
 
