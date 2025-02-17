@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import random
 
+
 def add_noise_to_profile(profile: list, noise_std: float = 0.05) -> np.ndarray:
     """
     Ajoute du bruit gaussien à un profil de consommation.
@@ -201,7 +202,7 @@ def generate_load_profile(
     # Date de début fixée au 01/01/2018
     start_date = date_obj(2018, 1, 1)
     end_date = start_date + timedelta(days=num_days - 1)
-    holidays =[date_obj(2018, 7, x) for x in range(27,32)]+[date_obj(2018, 8, x) for x in range(1,20)]+[date_obj(2018, 12, x) for x in range(14,32)]
+    holidays = [date_obj(2018, 7, x) for x in range(27,32)]+[date_obj(2018, 8, x) for x in range(1,20)]+[date_obj(2018, 12, x) for x in range(14,32)]
 
     dates = [start_date + timedelta(days=i) for i in range(num_days)]
     
@@ -229,7 +230,6 @@ def generate_load_profile(
             day_profile=day_profile*holiday_coefficient
         if day_type=='weekend':
             day_profile=day_profile*weekend_coeficent
-
         
         # Générer les timestamps pour la journée
         steps_per_day = 24 * 60 // time_step_min

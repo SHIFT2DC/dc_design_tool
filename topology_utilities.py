@@ -164,7 +164,7 @@ def find_lines_between_given_line_and_ext_grid(net, line_id):
     G = pp.topology.create_nxgraph(net)
 
     # Find the node connected to the external grid
-    ext_grid_node = net.ext_grid.loc[net.ext_grid['in_service']==True].bus.values[0]
+    ext_grid_node = net.ext_grid.loc[net.ext_grid['in_service'] == True].bus.values[0]
 
     # Find the nodes connected to the given line
     line = net.line.loc[line_id]
