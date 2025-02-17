@@ -281,7 +281,8 @@ def _create_lines(net: pp.pandapowerNet, line_data: pd.DataFrame, cable_catalogu
                 x_ohm_per_km=1e-20,
                 c_nf_per_km=0,
                 max_i_ka=1e3,
-                cable_rank=None
+                cable_rank=None,
+                section=None
             )
         else:
             cable = cable_catalogue.iloc[-1]
@@ -294,7 +295,8 @@ def _create_lines(net: pp.pandapowerNet, line_data: pd.DataFrame, cable_catalogu
                 x_ohm_per_km=1e-20,
                 c_nf_per_km=0,
                 max_i_ka=cable['Imax'] / 1000,
-                cable_rank=len(cable_catalogue) - 1
+                cable_rank=len(cable_catalogue) - 1,
+                section=cable['section']
             )
 
 
@@ -501,4 +503,4 @@ def _calculate_droop_curve(row: pd.Series, converter_default: pd.DataFrame) -> n
             ].values[0]
             return np.array(literal_eval('[' + str_dc.replace(';', ',') + ']'))
     else:
-        return
+        return np.array([[1.025, 1], [1, 1], [1, 1], [1, 1], [1, 1], [0.975, 1]])

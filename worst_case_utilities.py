@@ -152,7 +152,7 @@ def evaluate_scenario_performance(network, use_case, scenario_name):
 
     # Perform and visualize load flow
     scenario_network = perform_dc_load_flow(scenario_network, use_case)
-    pp.to_excel(scenario_network,rf'Sized_network_result_{scenario_name.split(" ")[3]}.xlsx')
+    pp.to_excel(scenario_network, rf'Sized_network_result_{scenario_name.split(" ")[3]}.xlsx')
     plot_network_with_plotly(scenario_network)
     return scenario_network
 

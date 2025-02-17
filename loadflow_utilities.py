@@ -114,15 +114,15 @@ def add_upstream_ext_grids(network_dict: Dict, network_id: int, tmp_net: pp.pand
     for upstream in network_dict[network_id]['direct_upstream_network']:
         bus = [x[1] for x in network_dict[upstream[0]]['direct_downstream_network']
                if x[0] == network_id][0]
-        v=1.0
-        if (not network_dict[upstream[0]]['network'].res_bus.empty) and (net.converter.loc[net.converter['name']==upstream[2],'type'].str.contains('PDU').values[0] ):
-            v=max(0.98,network_dict[upstream[0]]['network'].res_bus.loc[upstream[1],'vm_pu'])
-            v=min(1.02,v)
+        v = 1.0
+        if (not network_dict[upstream[0]]['network'].res_bus.empty) and (net.converter.loc[net.converter['name'] == upstream[2], 'type'].str.contains('PDU').values[0]):
+            v = max(0.98, network_dict[upstream[0]]['network'].res_bus.loc[upstream[1], 'vm_pu'])
+            v = min(1.02, v)
             
-        if len(tmp_net.ext_grid.loc[tmp_net.ext_grid['name']=='Converter emulation'])==0:    
+        if len(tmp_net.ext_grid.loc[tmp_net.ext_grid['name'] == 'Converter emulation']) == 0:
             pp.create_ext_grid(tmp_net, bus=bus, vm_pu=v, name='Converter emulation')
         else :
-            tmp_net.ext_grid.loc[tmp_net.ext_grid['name']=='Converter emulation','vm_pu']=v
+            tmp_net.ext_grid.loc[tmp_net.ext_grid['name'] == 'Converter emulation', 'vm_pu'] = v
 
 
 def update_upstream_network(network_dict: Dict, network_id: int, tmp_net: pp.pandapowerNet, net: pp.pandapowerNet) -> None:
@@ -208,7 +208,7 @@ def process_subnetwork(network_id: int, network_dict: Dict, loadflowed_subs: Lis
     # print(tmp_net.ext_grid)
     # if len(tmp_net.bus)==1:
     #     for i,row in tmp_net.res_bus.iterrows():
-    #         row['p_mw']=tmp_net.res_ext_grid.loc[0,'p_mw']
+    #         row['p_mw'] = tmp_net.res_ext_grid.loc[0,'p_mw']
     network_dict[network_id]['network'] = tmp_net
     loadflowed_subs.append(network_id)
 
@@ -229,28 +229,28 @@ def perform_dc_load_flow(net: pp.pandapowerNet, use_case: dict, PDU_droop_contro
     # Separate and sort subnetworks
     subnetwork_list = separate_subnetworks(net)
     network_dict = sorting_network(net, subnetwork_list)
-    err=1
-    prev_diff_volt=[0]*len(net.converter.loc[net.converter['type'].str.contains('PDU')])
-    diff_volt=[10]*len(net.converter.loc[net.converter['type'].str.contains('PDU')])
-    i=0
+    err = 1
+    prev_diff_volt = [0]*len(net.converter.loc[net.converter['type'].str.contains('PDU')])
+    diff_volt = [10]*len(net.converter.loc[net.converter['type'].str.contains('PDU')])
+    i = 0
     if PDU_droop_control:
         while ((err > 1e-8) and (sum(abs(np.array(prev_diff_volt)-np.array(diff_volt))) > 1e-8)) and (i < 100):
             i += 1
-        # Initialize results
+            # Initialize results
             loadflowed_subs = []
             initialize_converter_results(net)
-        # Process subnetworks sequentially
+            # Process subnetworks sequentially
             process_all_subnetworks(network_dict, loadflowed_subs, net)
-            err=0
-            prev_diff_volt=diff_volt
-            diff_volt=[]
+            err = 0
+            prev_diff_volt = diff_volt
+            diff_volt = []
             for network_id in network_dict.keys():
                 for upstream in network_dict[network_id]['direct_upstream_network']:
                     bus = [x[1] for x in network_dict[upstream[0]]['direct_downstream_network']
                         if x[0] == network_id][0]
-                    if net.converter.loc[net.converter['name'] == upstream[2],'type'].str.contains('PDU').values[0]:
-                        v_upstream = network_dict[upstream[0]]['network'].res_bus.loc[upstream[1],'vm_pu']
-                        v_downstream = network_dict[network_id]['network'].res_bus.loc[bus,'vm_pu']
+                    if net.converter.loc[net.converter['name'] == upstream[2], 'type'].str.contains('PDU').values[0]:
+                        v_upstream = network_dict[upstream[0]]['network'].res_bus.loc[upstream[1], 'vm_pu']
+                        v_downstream = network_dict[network_id]['network'].res_bus.loc[bus, 'vm_pu']
                         err += abs(v_upstream-v_downstream)
                         diff_volt.append(v_downstream)
     else:
@@ -341,7 +341,7 @@ def perform_load_flow_with_sizing(net: pp.pandapowerNet, cable_catalogue: pd.Dat
     # Step 4: Process subnetworks and perform cable adjustments
     net = process_subnetworks_with_cable_sizing(net, cable_catalogue, min_v, max_v,cable_factor)
 
-    _,max_v=define_voltage_limits(use_case)
+    _, max_v = define_voltage_limits(use_case)
     check_high_voltage_nodes(net, voltage_threshold=max_v)
 
     return net
@@ -486,7 +486,7 @@ def adjust_converter_sizing(net: pp.pandapowerNet, AC_DC_factor: int, converter_
     for i in net.converter.index:
         if net.converter.loc[i, 'conv_rank'] is not None:
             tmp_cc = net.converter.loc[i, 'converter_catalogue']
-            new_c,new_conv_rank = select_converter_based_on_power(tmp_cc, net.res_converter.loc[i, 'p_mw'],AC_DC_factor, converter_factor)
+            new_c, new_conv_rank = select_converter_based_on_power(tmp_cc, net.res_converter.loc[i, 'p_mw'], AC_DC_factor, converter_factor)
             update_converter_efficiency_curve(net, i, new_c)
             update_converter_attributes(net, i, new_c, int(new_conv_rank))
 
@@ -502,17 +502,17 @@ def select_converter_based_on_power(tmp_cc: pd.DataFrame, power_mw: float, AC_DC
     Returns:
         pd.Series: The selected converter.
     """
-    if 'AC/DC' in tmp_cc.loc[0,'Converter type']:
+    if 'AC/DC' in tmp_cc.loc[0, 'Converter type']:
         factor = AC_DC_factor
-    else :
+    else:
         factor = converter_factor
     if (tmp_cc['Nominal power (kW)']*(1-factor/100) > abs(power_mw * 1000)).values.any():
         # Find new converter with minimum capacity above required power
         filtered_tmp_cc = tmp_cc[tmp_cc['Nominal power (kW)']*(1-factor/100) > abs(power_mw * 1000)]
-        return filtered_tmp_cc.loc[filtered_tmp_cc['Nominal power (kW)'].idxmin()],filtered_tmp_cc['Nominal power (kW)'].idxmin()
+        return filtered_tmp_cc.loc[filtered_tmp_cc['Nominal power (kW)'].idxmin()], filtered_tmp_cc['Nominal power (kW)'].idxmin()
     else:
         # Otherwise, select the largest converter
-        return tmp_cc.loc[tmp_cc['Nominal power (kW)'].idxmax()],tmp_cc['Nominal power (kW)'].idxmax()
+        return tmp_cc.loc[tmp_cc['Nominal power (kW)'].idxmax()], tmp_cc['Nominal power (kW)'].idxmax()
 
 
 def update_converter_efficiency_curve(net: pp.pandapowerNet, i: int, new_c: pd.Series) -> None:
@@ -596,6 +596,7 @@ def adjust_single_cable(subnet: pp.pandapowerNet, line_id: int, cable_catalogue:
         subnet.line.r_ohm_per_km.loc[line_id] = new_cable['R'] * 1000
         subnet.line.max_i_ka.loc[line_id] = new_cable['Imax'] / 1000
         subnet.line.cable_rank.loc[line_id] = idx_new_cable
+        subnet.line.section.loc[line_id] = new_cable['section']
         try:
             pp.runpp(subnet)
         except:
@@ -609,6 +610,7 @@ def adjust_single_cable(subnet: pp.pandapowerNet, line_id: int, cable_catalogue:
         subnet.line.r_ohm_per_km.loc[line_id] = new_cable['R'] * 1000
         subnet.line.max_i_ka.loc[line_id] = new_cable['Imax'] / 1000
         subnet.line.cable_rank.loc[line_id] = idx_cable
+        subnet.line.section.loc[line_id] = new_cable['section']
     pp.runpp(subnet)
 
     # Check for downstream constraints
@@ -634,6 +636,7 @@ def check_downstream_line_size(subnet: pp.pandapowerNet, line_id: int, cable_cat
             subnet.line.r_ohm_per_km.loc[downstream_line] = new_cable['R'] * 1000
             subnet.line.max_i_ka.loc[downstream_line] = new_cable['Imax'] / 1000
             subnet.line.cable_rank.loc[downstream_line] += 1
+            subnet.line.section.loc[downstream_line] = new_cable['section']
             optimal = False
     pp.runpp(subnet)
     return optimal
@@ -686,44 +689,44 @@ def check_high_voltage_nodes(net, voltage_threshold=1.1):
 def update_network(net, t):
     for i, _ in net.load.iterrows():
         if not np.isnan(net.load.loc[i, 'power_profile']).any():
-            if t<len(net.load.loc[i, 'power_profile']):
+            if t < len(net.load.loc[i, 'power_profile']):
                 net.load.loc[i, 'p_mw'] = net.load.loc[i, 'power_profile'][t]*net.load.loc[i, 'p_nom_mw']
-            else :
+            else:
                 print('WARNING INCORRECT Number of timestep in User-define profile')
                 net.load.loc[i, 'p_mw'] = net.load.loc[i, 'power_profile'][-1]*net.load.loc[i, 'p_nom_mw']
     
     for i, _ in net.sgen.iterrows():
         if not np.isnan(net.sgen.loc[i, 'power_profile']).any():
-            if t<len(net.sgen.loc[i, 'power_profile']):
+            if t < len(net.sgen.loc[i, 'power_profile']):
                 net.sgen.loc[i, 'p_mw'] = net.sgen.loc[i, 'power_profile'][t]*net.sgen.loc[i, 'p_nom_mw']
-            else :
+            else:
                 print('WARNING INCORRECT Number of timestep in User-define profile')
                 net.sgen.loc[i, 'p_mw'] = net.sgen.loc[i, 'power_profile'][-1]*net.sgen.loc[i, 'p_nom_mw']
     for i, _ in net.storage.iterrows():
         if not np.isnan(net.storage.loc[i, 'power_profile']).any():
-            if t<len(net.storage.loc[i, 'power_profile']):
+            if t < len(net.storage.loc[i, 'power_profile']):
                 net.storage.loc[i, 'p_mw'] = net.storage.loc[i, 'power_profile'][t]*net.storage.loc[i, 'p_nom_mw']
-            else :
+            else:
                 print('WARNING INCORRECT Number of timestep in User-define profile')
                 net.storage.loc[i, 'p_mw'] = net.storage.loc[i, 'power_profile'][-1]*net.storage.loc[i, 'p_nom_mw']
 
 
 def format_result_dataframe(df, net):
-    for i,row in net.bus.iterrows():
+    for i, row in net.bus.iterrows():
         df[f'node {i} : v_pu'] = np.nan
-    for i,row in net.line.iterrows():
+    for i, row in net.line.iterrows():
         df[f'line {row.from_bus} - {row.to_bus} : i_ka'] = np.nan
         df[f'line {row.from_bus} - {row.to_bus} : loading'] = np.nan
         df[f'line {row.from_bus} - {row.to_bus} : pl_mw'] = np.nan
-    for i,row in net.load.iterrows():
+    for i, row in net.load.iterrows():
         df[f'load {row["name"]} : p_mw'] = np.nan
-    for i,row in net.sgen.iterrows():
+    for i, row in net.sgen.iterrows():
         df[f'sgen {row["name"]} : p_mw'] = np.nan
-    for i,row in net.storage.iterrows():
+    for i, row in net.storage.iterrows():
         df[f'storage {row["name"]} : p_mw'] = np.nan
         if "Battery" in row["name"]:
             df[f'storage {row["name"]} : SOC'] = np.nan
-    for i,row in net.converter.iterrows():
+    for i, row in net.converter.iterrows():
         df[f'{row["name"]} : p_mw'] = np.nan
         df[f'{row["name"]} : loading'] = np.nan
         df[f'{row["name"]} : pl_mw'] = np.nan
@@ -731,24 +734,24 @@ def format_result_dataframe(df, net):
 
 
 def fill_result_dataframe(df, t, net):
-    for i,row in net.bus.iterrows():
-        df.loc[t,f'node {i} : v_pu'] = net.res_bus.loc[i,'vm_pu']
-    for i,row in net.line.iterrows():
-        df.loc[t, f'line {row.from_bus} - {row.to_bus} : i_ka'] = net.res_line.loc[i,'i_ka']
-        df.loc[t, f'line {row.from_bus} - {row.to_bus} : loading'] = net.res_line.loc[i,'loading_percent']
-        df.loc[t, f'line {row.from_bus} - {row.to_bus} : pl_mw'] = net.res_line.loc[i,'pl_mw']
-    for i,row in net.load.iterrows():
-        df.loc[t, f'load {row["name"]} : p_mw'] = net.res_load.loc[i,'p_mw']
-    for i,row in net.sgen.iterrows():
-        df.loc[t, f'sgen {row["name"]} : p_mw'] = net.res_sgen.loc[i,'p_mw']
-    for i,row in net.storage.iterrows():
-        df.loc[t, f'storage {row["name"]} : p_mw'] = net.res_storage.loc[i,'p_mw']
+    for i, row in net.bus.iterrows():
+        df.loc[t, f'node {i} : v_pu'] = net.res_bus.loc[i, 'vm_pu']
+    for i, row in net.line.iterrows():
+        df.loc[t, f'line {row.from_bus} - {row.to_bus} : i_ka'] = net.res_line.loc[i, 'i_ka']
+        df.loc[t, f'line {row.from_bus} - {row.to_bus} : loading'] = net.res_line.loc[i, 'loading_percent']
+        df.loc[t, f'line {row.from_bus} - {row.to_bus} : pl_mw'] = net.res_line.loc[i, 'pl_mw']
+    for i, row in net.load.iterrows():
+        df.loc[t, f'load {row["name"]} : p_mw'] = net.res_load.loc[i, 'p_mw']
+    for i, row in net.sgen.iterrows():
+        df.loc[t, f'sgen {row["name"]} : p_mw'] = net.res_sgen.loc[i, 'p_mw']
+    for i, row in net.storage.iterrows():
+        df.loc[t, f'storage {row["name"]} : p_mw'] = net.res_storage.loc[i, 'p_mw']
         if "Battery" in row["name"]:
-            df.loc[t, f'storage {row["name"]} : SOC'] = net.storage.loc[i,'soc_percent']
-    for i,row in net.converter.iterrows():
-        df.loc[t, f'{row["name"]} : p_mw'] = net.res_converter.loc[i,'p_mw']
-        df.loc[t, f'{row["name"]} : loading'] = net.res_converter.loc[i,'loading (%)']
-        df.loc[t, f'{row["name"]} : pl_mw'] = net.res_converter.loc[i,'pl_mw']
+            df.loc[t, f'storage {row["name"]} : SOC'] = net.storage.loc[i, 'soc_percent']
+    for i, row in net.converter.iterrows():
+        df.loc[t, f'{row["name"]} : p_mw'] = net.res_converter.loc[i, 'p_mw']
+        df.loc[t, f'{row["name"]} : loading'] = net.res_converter.loc[i, 'loading (%)']
+        df.loc[t, f'{row["name"]} : pl_mw'] = net.res_converter.loc[i, 'pl_mw']
     return df
 
 
@@ -831,13 +834,13 @@ def droop_correction(net,t,time_step_duration):
     SOC_list = []
     attributes = ['load', 'sgen', 'storage']
     for attr in attributes:
-        for i,_ in getattr(net,attr).iterrows():
+        for i, _ in getattr(net,attr).iterrows():
             voltage_bus, v_asset = get_voltage_bus(i, attr, net)
             droop_curve = get_droop_curve(i, attr, net)
             if (attr == 'storage') and ('Battery' in getattr(net, attr).loc[i, 'name']):
                 p_droop, SOC = interpolate_bess_p_droop(i, attr, net, droop_curve, t, time_step_duration, v_asset)
                 SOC_list.append(SOC)
-            else :
+            else:
                 p_droop = interpolate_p_droop(i, attr, net, droop_curve, t, v_asset)
             getattr(net, attr).loc[i, 'p_mw'] = p_droop
     return net, SOC_list
@@ -851,13 +854,13 @@ def get_voltage_bus(i, attr, net):
         voltage_bus = asset_bus
     else:
         converter_id = converter_connected.index[0]
-        if net.converter.loc[converter_id,'from_bus'] == asset_bus:
+        if net.converter.loc[converter_id, 'from_bus'] == asset_bus:
             voltage_bus = net.converter.loc[converter_id, 'to_bus']
         else:
             voltage_bus = net.converter.loc[converter_id, 'from_bus']
 
     v_asset = net.res_bus.loc[voltage_bus, 'vm_pu'].item()
-    return voltage_bus,v_asset
+    return voltage_bus, v_asset
 
 
 def get_droop_curve(i, attr, net):
@@ -921,4 +924,3 @@ def interpolate_bess_p_droop(i, attr, net, droop_curve, t, duration, v_asset):
         SOC_f = ini_SOC + SOC_max_var
 
     return p_droop, SOC_f
-

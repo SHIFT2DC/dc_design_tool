@@ -57,31 +57,32 @@ def plot_network_with_plotly(net):
             V1 = net_plot.bus.vn_kv.loc[net_plot.bus.index == row.from_bus].values[0]
             V2 = net_plot.bus.vn_kv.loc[net_plot.bus.index == row.to_bus].values[0]
 
-            if V1>V2:
-                pp.create_transformer_from_parameters(net_plot,hv_bus=row.from_bus,lv_bus=row.to_bus,
-                                                      sn_mva=row.P,vn_hv_kv=V1,vn_lv_kv=V2,
-                                                      vkr_percent=0,vk_percent=0,pfe_kw=0,i0_percent=0)
+            if V1 > V2:
+                pp.create_transformer_from_parameters(net_plot, hv_bus=row.from_bus, lv_bus=row.to_bus,
+                                                      sn_mva=row.P, vn_hv_kv=V1, vn_lv_kv=V2,
+                                                      vkr_percent=0, vk_percent=0, pfe_kw=0,i0_percent=0)
             else:
-                pp.create_transformer_from_parameters(net_plot,hv_bus=row.to_bus,lv_bus=row.from_bus,
-                                                      sn_mva=row.P,vn_hv_kv=V2,vn_lv_kv=V1,
-                                                      vkr_percent=0,vk_percent=0,pfe_kw=0,i0_percent=0)
+                pp.create_transformer_from_parameters(net_plot, hv_bus=row.to_bus, lv_bus=row.from_bus,
+                                                      sn_mva=row.P, vn_hv_kv=V2, vn_lv_kv=V1,
+                                                      vkr_percent=0, vk_percent=0, pfe_kw=0, i0_percent=0)
 
     # Create a figure plotly
-    pplotly.create_generic_coordinates(net_plot, mg=None, library='igraph', respect_switches=True, trafo_length_km=0.0000001 ,geodata_table='bus_geodata', buses=None, overwrite=True)
-    fig = pplotly.simple_plotly(net_plot,auto_open=False)
-    line_trace = pplotly.create_line_trace(net_plot,cmap="jet",cmap_vals=net_plot.res_line.loading_percent,width=4.0,
+    pplotly.create_generic_coordinates(net_plot, mg=None, library='igraph', respect_switches=True,
+                                       trafo_length_km=0.0000001, geodata_table='bus_geodata', buses=None, overwrite=True)
+    fig = pplotly.simple_plotly(net_plot, auto_open=False)
+    line_trace = pplotly.create_line_trace(net_plot, cmap="jet", cmap_vals=net_plot.res_line.loading_percent, width=4.0,
                                            infofunc=(Series(index=net.line.index,
-                                        data=[f'I : {row.i_ka*1000:.1f} A <br>loading : {row.loading_percent:.1f} % <br> cable_rank : {net.line.loc[i,"cable_rank"]}' for i,row in net.res_line.iterrows()]
-                                                          )))
-    bus_trace = pplotly.create_bus_trace(net_plot,cmap="jet_r",cmap_vals=net_plot.res_bus.vm_pu, size=10,
+                                                            data=[f'I : {row.i_ka*1000:.1f} A <br>loading : {row.loading_percent:.1f} % <br> cable_rank : {net.line.loc[i,"cable_rank"]}' for i, row in net.res_line.iterrows()]
+                                                            )))
+    bus_trace = pplotly.create_bus_trace(net_plot, cmap="jet_r", cmap_vals=net_plot.res_bus.vm_pu, size=10,
                                          infofunc=(Series(index=net.bus.index,
-                                         data=[s1 + s2 for s1, s2 in zip(net.bus.index.astype(str), net.res_bus.vm_pu.apply(lambda x : f'<br> V : {x:.3f} <br>').values)]
+                                                          data=[s1 + s2 for s1, s2 in zip(net.bus.index.astype(str), net.res_bus.vm_pu.apply(lambda x: f'<br> V : {x:.3f} <br>').values)]
                                                           )))
     
-    trafo_trace = pplotly.create_trafo_trace(net_plot,color='black',width=15,infofunc=(Series(index=net.converter.index,
-                                             data=[f'P : {row.p_mw*1000:.1f} kW <br>loading : {net.res_converter.loc[i,"loading (%)"]:.1f} % <br> conv_rank : {net.converter.loc[i,"conv_rank"]}' for i,row in net.res_converter.iterrows()]
+    trafo_trace = pplotly.create_trafo_trace(net_plot, color='black', width=15, infofunc=(Series(index=net.converter.index,
+                                             data=[f'P : {row.p_mw*1000:.1f} kW <br>loading : {net.res_converter.loc[i,"loading (%)"]:.1f} % <br> conv_rank : {net.converter.loc[i,"conv_rank"]}' for i, row in net.res_converter.iterrows()]
                                                           )))
     fig = pplotly.draw_traces(line_trace+trafo_trace+bus_trace,
                               figsize=2, aspectratio=(20, 10),
-                              filename='NetworkEcartLEPlot.html', auto_open=False,showlegend=False)
+                              filename='NetworkEcartLEPlot.html', auto_open=False, showlegend=False)
     fig.show()
