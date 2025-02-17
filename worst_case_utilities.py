@@ -76,7 +76,8 @@ def apply_battery_specifications(network, battery_specs):
 
 def create_scenario_network(network, cable_catalogue, use_case, scenario_name):
     """
-    Creates a network configuration for a given scenario.
+    Creates a network configuration for a given scenario by adjusting components (loads, generation, storage, etc.)
+    based on the scenario's parameters and sizing factors..
     
     Args:
         network (pp.Network): Base network model
