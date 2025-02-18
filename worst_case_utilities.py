@@ -5,7 +5,7 @@ import copy
 import math
 
 
-def calculate_storage_sizing_scenario(network, cable_catalogue, use_case):
+def calculate_storage_sizing_scenario(network, cable_catalogue, use_case, node_data):
     """
     Calculates battery storage requirements for worst-case scenario 1.
     
@@ -13,6 +13,7 @@ def calculate_storage_sizing_scenario(network, cable_catalogue, use_case):
         network (pp.Network): Pandapower network model
         cable_catalogue: Cable specifications database
         use_case (dict): Scenario configuration parameters
+        node_data
         
     Returns:
         tuple: (Modified network, Battery specifications dictionary)
@@ -45,7 +46,7 @@ def calculate_storage_sizing_scenario(network, cable_catalogue, use_case):
         pp.create_ext_grid(scenario_network, bus=battery['bus'], vm_pu=1.0)
         
         # Perform load flow with component sizing
-        sized_network = perform_load_flow_with_sizing(scenario_network, cable_catalogue, use_case)
+        sized_network = perform_load_flow_with_sizing(scenario_network, cable_catalogue, use_case, node_data)
         
         # Calculate battery specifications
         grid_power = sized_network.res_ext_grid.loc[sized_network.ext_grid['in_service'], 'p_mw'].values[0]
@@ -74,7 +75,7 @@ def apply_battery_specifications(network, battery_specs):
         network.storage.loc[battery_mask, 'p_nom_mw'] = abs(specs['power_kw'] / 1000)
 
 
-def create_scenario_network(network, cable_catalogue, use_case, scenario_name):
+def create_scenario_network(network, cable_catalogue, use_case, scenario_name, node_data):
     """
     Creates a network configuration for a given scenario by adjusting components (loads, generation, storage, etc.)
     based on the scenario's parameters and sizing factors..
@@ -84,6 +85,7 @@ def create_scenario_network(network, cable_catalogue, use_case, scenario_name):
         cable_catalogue: Cable specifications database
         use_case (dict): Scenario parameters
         scenario_name (str): Name of scenario configuration
+        node_data
         
     Returns:
         pp.Network: Configured network model
@@ -113,10 +115,10 @@ def create_scenario_network(network, cable_catalogue, use_case, scenario_name):
         scenario_network.storage.loc[battery_mask, 'p_mw'] = -current_power * storage_percent/100
 
     # Perform load flow analysis with component sizing
-    return perform_load_flow_with_sizing(scenario_network, cable_catalogue, use_case)
+    return perform_load_flow_with_sizing(scenario_network, cable_catalogue, use_case, node_data)
 
 
-def evaluate_scenario_performance(network, use_case, scenario_name):
+def evaluate_scenario_performance(network, use_case, scenario_name, node_data):
     """
     Evaluates network performance for a given scenario with visualization.
     
@@ -124,6 +126,7 @@ def evaluate_scenario_performance(network, use_case, scenario_name):
         network (pp.Network): Network model to test
         use_case (dict): Scenario parameters
         scenario_name (str): Name of scenario configuration
+        node_data
         
     Returns:
         pp.Network: Analyzed network model
@@ -151,7 +154,7 @@ def evaluate_scenario_performance(network, use_case, scenario_name):
     scenario_network.storage.loc[battery_mask, 'p_mw'] = -current_power * storage_percent/100
 
     # Perform and visualize load flow
-    scenario_network = perform_dc_load_flow(scenario_network, use_case)
+    scenario_network = perform_dc_load_flow(scenario_network, use_case, node_data)
     pp.to_excel(scenario_network, rf'Sized_network_result_{scenario_name.split(" ")[3]}.xlsx')
     plot_network_with_plotly(scenario_network)
     return scenario_network
@@ -181,7 +184,7 @@ def merge_network_components(base_network, comparison_network):
     return merged_network
 
 
-def perform_comprehensive_sizing(network, cable_catalogue, use_case):
+def perform_comprehensive_sizing(network, cable_catalogue, use_case, node_data):
     """
     Executes complete network sizing process across all scenarios.
     
@@ -189,25 +192,25 @@ def perform_comprehensive_sizing(network, cable_catalogue, use_case):
         network (pp.Network): Base network model
         cable_catalogue: Cable specifications database
         use_case (dict): Scenario configuration parameters
+        node_data
         
     Returns:
         pp.Network: Fully sized network model
     """
     # Scenario 1: Storage sizing
-    storage_network, battery_specs = calculate_storage_sizing_scenario(network, cable_catalogue, use_case)
+    storage_network, battery_specs = calculate_storage_sizing_scenario(network, cable_catalogue, use_case, node_data)
     apply_battery_specifications(network, battery_specs)
     
     # Scenario 2: Cable and converter sizing
     scenario2_network = create_scenario_network(
         network, cable_catalogue, use_case,
-        'Worst case scenario 2 for sizing of cables and  PDU DC/DC,  DC/AC, PV DC/DC and EV DC/DC converters '
-    )
+        'Worst case scenario 2 for sizing of cables and  PDU DC/DC,  DC/AC, PV DC/DC and EV DC/DC converters ',
+        node_data)
     
     # Scenario 3: AC/DC converter sizing
     scenario3_network = create_scenario_network(
         network, cable_catalogue, use_case,
-        'Worst case scenario 3 for sizing cables and AC/DC converter'
-    )
+        'Worst case scenario 3 for sizing cables and AC/DC converter', node_data)
     
     # Combine results from all scenarios
     combined_network = merge_network_components(scenario2_network,storage_network)
@@ -216,30 +219,29 @@ def perform_comprehensive_sizing(network, cable_catalogue, use_case):
     return final_network
 
 
-def validate_network_performance(network, use_case):
+def validate_network_performance(network, use_case, node_data):
     """
     Validates network performance across all defined scenarios.
     
     Args:
         network (pp.Network): Network model to validate
         use_case (dict): Scenario configuration parameters
+        node_data
         
     Returns:
         tuple: Networks from all test scenarios
     """
     scenario1 = evaluate_scenario_performance(
         network, use_case,
-        'Worst case scenario 1 for sizing of Storage DC/DC converter '
-    )
+        'Worst case scenario 1 for sizing of Storage DC/DC converter ', node_data)
     
     scenario2 = evaluate_scenario_performance(
         network, use_case,
-        'Worst case scenario 2 for sizing of cables and  PDU DC/DC,  DC/AC, PV DC/DC and EV DC/DC converters '
-    )
+        'Worst case scenario 2 for sizing of cables and  PDU DC/DC,  DC/AC, PV DC/DC and EV DC/DC converters ',
+        node_data)
     
     scenario3 = evaluate_scenario_performance(
         network, use_case,
-        'Worst case scenario 3 for sizing cables and AC/DC converter'
-    )
+        'Worst case scenario 3 for sizing cables and AC/DC converter', node_data)
     
     return scenario1, scenario2, scenario3

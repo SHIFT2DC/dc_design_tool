@@ -31,3 +31,4 @@ def read_UC_Definition(xl_file):
     i_start = list(df.loc[df['param'] == 'Parameters for annual simulations'].index)[0]+1
     UC_Definition['Parameters for annual simulations'] = {df.iloc[i_start+i].param: df.iloc[i_start+i].val for i in range(2)}
     return UC_Definition
+

@@ -22,6 +22,7 @@ def create_DC_network(path: str, path_cable_catalogue: str, path_converter_catal
             - net (pandapower.Network): The created pandapower network.
             - cable_catalogue (pd.DataFrame): The processed cable catalogue.
             - Uc (dict): Dictionary containing UC definition data.
+            - node_data
     """
     # Create an empty pandapower network
     net = pp.create_empty_network()
@@ -65,7 +66,7 @@ def create_DC_network(path: str, path_cable_catalogue: str, path_converter_catal
     # Create converters
     _create_converters(net, converter_data, converter_default, converter_catalogue)
 
-    return net, cable_catalogue, Uc
+    return net, cable_catalogue, Uc, node_data
 
 
 def _create_buses_and_components(net: pp.pandapowerNet, node_data: pd.DataFrame, converter_default, user_profile_data, default_assets_profile, use_case) -> None:
@@ -131,7 +132,7 @@ def _create_buses_and_components(net: pp.pandapowerNet, node_data: pd.DataFrame,
                     net.load['default_power_profile'] = net.load['default_power_profile'].astype('object')
 
                 net.load.at[l, 'default_power_profile'] = default_assets_profile[row['Asset profile type']].values
-                _,load_profile,_=generate_load_profile(timelaps,timestep,net.load.at[l, 'default_power_profile'],noise_std=0.1,
+                _, load_profile, _ = generate_load_profile(timelaps, timestep, net.load.at[l, 'default_power_profile'], noise_std=0.1,
                                                                         summer_coeficient=0.95,winter_coeficient=1.1,
                                                                         holiday_coefficient=1/5,weekend_coeficent=1/20,
                                                                         day_varation_sigma=0.1)
@@ -453,7 +454,7 @@ def _add_converter_from_catalogue(net: pp.pandapowerNet, row: pd.Series, convert
         "droop_curve": droop_curve,
         'converter_catalogue': tmp_cc,
         "conv_rank": tmp_cc['Nominal power (kW)'].idxmin(),
-        'stand_by_loss' : conv['Stand-by losses (W)'] / 1e6
+        'stand_by_loss': conv['Stand-by losses (W)'] / 1e6
     }
     net.converter.loc[len(net.converter)] = new_row
 

@@ -12,6 +12,7 @@ from ast import literal_eval
 from topology_utilities import separate_subnetworks, sorting_network, merge_networks, find_lines_between_given_line_and_ext_grid
 from typing import Dict, List
 from tqdm import tqdm
+import warnings
 
 
 def clean_network(net: pp.pandapowerNet, original_net: pp.pandapowerNet) -> pp.pandapowerNet:
@@ -121,7 +122,7 @@ def add_upstream_ext_grids(network_dict: Dict, network_id: int, tmp_net: pp.pand
             
         if len(tmp_net.ext_grid.loc[tmp_net.ext_grid['name'] == 'Converter emulation']) == 0:
             pp.create_ext_grid(tmp_net, bus=bus, vm_pu=v, name='Converter emulation')
-        else :
+        else:
             tmp_net.ext_grid.loc[tmp_net.ext_grid['name'] == 'Converter emulation', 'vm_pu'] = v
 
 
@@ -160,8 +161,8 @@ def add_load_to_upstream(up_net: pp.pandapowerNet, bus: int, adjusted_power: flo
         adjusted_power (float): The power value for the load.
         network_id (int): The ID of the subnetwork.
     """
-    if len(up_net.load.loc[up_net.load['name']==f'Load of net {network_id}'])!=0:
-        up_net.load.loc[up_net.load['name']==f'Load of net {network_id}','p_mw']=adjusted_power
+    if len(up_net.load.loc[up_net.load['name'] == f'Load of net {network_id}']) != 0:
+        up_net.load.loc[up_net.load['name'] == f'Load of net {network_id}', 'p_mw'] = adjusted_power
     else:
         pp.create_load(
             up_net,
@@ -188,7 +189,7 @@ def update_converter_results(net: pp.pandapowerNet, converter_name: str, adjuste
     net.res_converter.loc[net.converter.name == converter_name, 'pl_mw'] = power_loss
 
 
-def process_subnetwork(network_id: int, network_dict: Dict, loadflowed_subs: List[int], net: pp.pandapowerNet) -> None:
+def process_subnetwork(network_id: int, network_dict: Dict, loadflowed_subs: List[int], net: pp.pandapowerNet, node_data) -> None:
     """
     Processes a single subnetwork in the DC load flow calculation.
 
@@ -197,6 +198,7 @@ def process_subnetwork(network_id: int, network_dict: Dict, loadflowed_subs: Lis
         network_dict (Dict): Dictionary containing all subnetwork data.
         loadflowed_subs (List[int]): List of already processed subnetworks.
         net (pp.pandapowerNet): Main network containing converter data.
+        node_data: node data
     """
     tmp_net = network_dict[network_id]['network']
 
@@ -205,10 +207,33 @@ def process_subnetwork(network_id: int, network_dict: Dict, loadflowed_subs: Lis
 
     # Run power flow
     pp.runpp(tmp_net)
+
+    # Adjust results if network contains 1 bus
+    if len(tmp_net.bus) == 1:
+        #path = 'grid_data_input_file_building_demo.xlsx'
+        #xl_file = pd.ExcelFile(path)
+        #node_data = xl_file.parse('Assets Nodes')
+        bus_idx = tmp_net.bus.index.values[0]
+        matching_row = node_data.loc[node_data['Node number'] == bus_idx]
+        matching_row['Component type'] = matching_row['Component type'].str.replace(' ', '').str.lower()
+        component_type = matching_row['Component type'].values[0]
+        if component_type == 'acgrid':
+            node_idx = tmp_net.ext_grid.index.values[0]
+            tmp_net.res_bus.loc[bus_idx, 'p_mw'] = tmp_net.res_ext_grid.loc[node_idx, 'p_mw']
+        elif component_type in ['dcload', 'acload']:
+            node_idx = tmp_net.load.index.values[0]
+            tmp_net.res_bus.loc[bus_idx, 'p_mw'] = tmp_net.res_load.loc[node_idx, 'p_mw']
+        elif component_type == 'ev':
+            node_idx = tmp_net.storage.index.values[0]
+            tmp_net.res_bus.loc[bus_idx, 'p_mw'] = tmp_net.res_storage.loc[node_idx, 'p_mw']
+        elif component_type == 'storage':
+            node_idx = tmp_net.storage.index.values[0]
+            tmp_net.res_bus.loc[bus_idx, 'p_mw'] = tmp_net.res_storage.loc[node_idx, 'p_mw']
+        elif component_type == 'pv':
+            node_idx = tmp_net.sgen.index.values[0]
+            tmp_net.res_bus.loc[bus_idx, 'p_mw'] = tmp_net.res_sgen.loc[node_idx, 'p_mw']
     # print(tmp_net.ext_grid)
-    # if len(tmp_net.bus)==1:
-    #     for i,row in tmp_net.res_bus.iterrows():
-    #         row['p_mw'] = tmp_net.res_ext_grid.loc[0,'p_mw']
+
     network_dict[network_id]['network'] = tmp_net
     loadflowed_subs.append(network_id)
 
@@ -216,12 +241,15 @@ def process_subnetwork(network_id: int, network_dict: Dict, loadflowed_subs: Lis
     update_upstream_network(network_dict, network_id, tmp_net, net)
 
 
-def perform_dc_load_flow(net: pp.pandapowerNet, use_case: dict, PDU_droop_control=False) -> pp.pandapowerNet:
+def perform_dc_load_flow(net: pp.pandapowerNet, use_case: dict, node_data, PDU_droop_control=False) -> pp.pandapowerNet:
     """
     Performs DC load flow calculation on the network.
 
     Args:
         net (pp.pandapowerNet): The network to analyze.
+        use_case
+        PDU_droop_control
+        node_data
 
     Returns:
         pp.pandapowerNet: The network with load flow results.
@@ -240,14 +268,14 @@ def perform_dc_load_flow(net: pp.pandapowerNet, use_case: dict, PDU_droop_contro
             loadflowed_subs = []
             initialize_converter_results(net)
             # Process subnetworks sequentially
-            process_all_subnetworks(network_dict, loadflowed_subs, net)
+            process_all_subnetworks(network_dict, loadflowed_subs, net, node_data)
             err = 0
             prev_diff_volt = diff_volt
             diff_volt = []
             for network_id in network_dict.keys():
                 for upstream in network_dict[network_id]['direct_upstream_network']:
                     bus = [x[1] for x in network_dict[upstream[0]]['direct_downstream_network']
-                        if x[0] == network_id][0]
+                           if x[0] == network_id][0]
                     if net.converter.loc[net.converter['name'] == upstream[2], 'type'].str.contains('PDU').values[0]:
                         v_upstream = network_dict[upstream[0]]['network'].res_bus.loc[upstream[1], 'vm_pu']
                         v_downstream = network_dict[network_id]['network'].res_bus.loc[bus, 'vm_pu']
@@ -257,7 +285,7 @@ def perform_dc_load_flow(net: pp.pandapowerNet, use_case: dict, PDU_droop_contro
         loadflowed_subs = []
         initialize_converter_results(net)
         # Process subnetworks sequentially
-        process_all_subnetworks(network_dict, loadflowed_subs, net)
+        process_all_subnetworks(network_dict, loadflowed_subs, net, node_data)
 
     # Merge results and clean network
     net_res = merge_networks([network_dict[n]['network'] for n in network_dict.keys()])
@@ -282,7 +310,7 @@ def initialize_converter_results(net: pp.pandapowerNet) -> None:
     )
 
 
-def process_all_subnetworks(network_dict: Dict, loadflowed_subs: List[int], net: pp.pandapowerNet) -> None:
+def process_all_subnetworks(network_dict: Dict, loadflowed_subs: List[int], net: pp.pandapowerNet, node_data) -> None:
     """
     Processes all subnetworks in the network.
 
@@ -290,13 +318,14 @@ def process_all_subnetworks(network_dict: Dict, loadflowed_subs: List[int], net:
         network_dict (Dict): Dictionary containing all subnetwork data.
         loadflowed_subs (List[int]): List of already processed subnetworks.
         net (pp.pandapowerNet): The main network.
+        node_data: node data
     """
     while not all(elem in loadflowed_subs for elem in network_dict.keys()):
         unprocessed = set(network_dict.keys()) - set(loadflowed_subs)
 
         for network_id in unprocessed:
             if all_downstream_processed(network_dict, network_id, loadflowed_subs):
-                process_subnetwork(network_id, network_dict, loadflowed_subs, net)
+                process_subnetwork(network_id, network_dict, loadflowed_subs, net, node_data)
 
 
 def all_downstream_processed(network_dict: Dict, network_id: int, loadflowed_subs: List[int]) -> bool:
@@ -317,7 +346,7 @@ def all_downstream_processed(network_dict: Dict, network_id: int, loadflowed_sub
     )
 
 
-def perform_load_flow_with_sizing(net: pp.pandapowerNet, cable_catalogue: pd.DataFrame, use_case: Dict) -> pp.pandapowerNet:
+def perform_load_flow_with_sizing(net: pp.pandapowerNet, cable_catalogue: pd.DataFrame, use_case: Dict, node_data) -> pp.pandapowerNet:
     """
     Performs DC load flow calculation with sizing adjustments for converters and cables.
 
@@ -325,6 +354,7 @@ def perform_load_flow_with_sizing(net: pp.pandapowerNet, cable_catalogue: pd.Dat
         net (pp.pandapowerNet): The pandapower network.
         cable_catalogue (pd.DataFrame): DataFrame containing cable specifications.
         use_case (Dict): Dictionary specifying project details and constraints.
+        node_data: node data
 
     Returns:
         pp.pandapowerNet: The updated network after DC load flow and sizing adjustments.
@@ -333,13 +363,13 @@ def perform_load_flow_with_sizing(net: pp.pandapowerNet, cable_catalogue: pd.Dat
     min_v, max_v = define_voltage_limits(use_case)
     cable_factor, AC_DC_factor, converter_factor = define_sizing_security_factor(use_case)
     # Step 2: Perform initial DC load flow analysis
-    net = perform_dc_load_flow(net,use_case,PDU_droop_control=False)
+    net = perform_dc_load_flow(net, use_case, node_data, PDU_droop_control=False)
 
     # Step 3: Adjust converter sizing based on load flow results
     adjust_converter_sizing(net, AC_DC_factor, converter_factor)
 
     # Step 4: Process subnetworks and perform cable adjustments
-    net = process_subnetworks_with_cable_sizing(net, cable_catalogue, min_v, max_v,cable_factor)
+    net = process_subnetworks_with_cable_sizing(net, cable_catalogue, min_v, max_v, cable_factor, node_data)
 
     _, max_v = define_voltage_limits(use_case)
     check_high_voltage_nodes(net, voltage_threshold=max_v)
@@ -379,7 +409,7 @@ def define_sizing_security_factor(use_case: Dict) -> tuple:
     return cable_factor, AC_DC_factor, converter_factor
 
 
-def process_subnetworks_with_cable_sizing(net: pp.pandapowerNet, cable_catalogue: pd.DataFrame, min_v: float, max_v: float, cable_factor: int) -> pp.pandapowerNet:
+def process_subnetworks_with_cable_sizing(net: pp.pandapowerNet, cable_catalogue: pd.DataFrame, min_v: float, max_v: float, cable_factor: int, node_data) -> pp.pandapowerNet:
     """
     Processes all subnetworks and adjusts cable sizing based on load flow results.
 
@@ -388,6 +418,7 @@ def process_subnetworks_with_cable_sizing(net: pp.pandapowerNet, cable_catalogue
         cable_catalogue (pd.DataFrame): DataFrame containing cable specifications.
         min_v (float): Minimum voltage limit.
         max_v (float): Maximum voltage limit.
+        node_data: node data
     """
     # Separate the network into subnetworks
     subnetwork_list = separate_subnetworks(net)
@@ -400,13 +431,13 @@ def process_subnetworks_with_cable_sizing(net: pp.pandapowerNet, cable_catalogue
     while not all(sub in loadflowed_subs for sub in dic_of_subs.keys()):
         for n in set(dic_of_subs.keys()) - set(loadflowed_subs):
             if all_downstream_processed(dic_of_subs, n, loadflowed_subs):
-                process_single_subnetwork_with_cable_sizing(dic_of_subs, n, cable_catalogue, min_v, max_v, loadflowed_subs, net, cable_factor)
+                process_single_subnetwork_with_cable_sizing(dic_of_subs, n, cable_catalogue, min_v, max_v, loadflowed_subs, net, cable_factor, node_data)
     
     net_res = merge_networks([dic_of_subs[n]['network'] for n in dic_of_subs.keys()])
     return clean_network(net_res, net)
     
 
-def process_single_subnetwork_with_cable_sizing(dic_of_subs: Dict, n: int, cable_catalogue: pd.DataFrame, min_v: float, max_v: float, loadflowed_subs: List[int], net: pp.pandapowerNet, cable_factor: int) -> None:
+def process_single_subnetwork_with_cable_sizing(dic_of_subs: Dict, n: int, cable_catalogue: pd.DataFrame, min_v: float, max_v: float, loadflowed_subs: List[int], net: pp.pandapowerNet, cable_factor: int, node_data) -> None:
     """
     Processes a single subnetwork and adjusts cable sizing.
 
@@ -418,14 +449,39 @@ def process_single_subnetwork_with_cable_sizing(dic_of_subs: Dict, n: int, cable
         max_v (float): Maximum voltage limit.
         loadflowed_subs (List[int]): List of already processed subnetworks.
         net (pp.pandapowerNet): The main network.
+        node_data: node data
     """
     tmp_net = dic_of_subs[n]['network']
 
     # Add external grids for upstream connections
     add_upstream_ext_grids_for_sizing(dic_of_subs, n, tmp_net)
 
-    # Run power flow and adjust cable sizing
+    # Run power flow a
     pp.runpp(tmp_net)
+
+    # Adjust results if network contains 1 bus
+    if len(tmp_net.bus) == 1:
+        #path = 'grid_data_input_file_building_demo.xlsx'
+        #xl_file = pd.ExcelFile(path)
+        #node_data = xl_file.parse('Assets Nodes')
+        bus_idx = tmp_net.bus.index.values[0]
+        matching_row = node_data.loc[node_data['Node number'] == bus_idx]
+        matching_row['Component type'] = matching_row['Component type'].str.replace(' ', '').str.lower()
+        component_type = matching_row['Component type'].values[0]
+        if component_type == 'acgrid':
+            node_idx = tmp_net.ext_grid.index.values[0]
+            tmp_net.res_bus.loc[bus_idx, 'p_mw'] = tmp_net.res_ext_grid.loc[node_idx, 'p_mw']
+        elif component_type in ['dcload', 'acload']:
+            node_idx = tmp_net.load.index.values[0]
+            tmp_net.res_bus.loc[bus_idx, 'p_mw'] = tmp_net.res_load.loc[node_idx, 'p_mw']
+        elif component_type == 'ev':
+            node_idx = tmp_net.storage.index.values[0]
+            tmp_net.res_bus.loc[bus_idx, 'p_mw'] = tmp_net.res_storage.loc[node_idx, 'p_mw']
+        elif component_type == 'storage':
+            node_idx = tmp_net.storage.index.values[0]
+            tmp_net.res_bus.loc[bus_idx, 'p_mw'] = tmp_net.res_storage.loc[node_idx, 'p_mw']
+
+    # adjust cable sizing
     adjust_cable_sizing(tmp_net, cable_catalogue, min_v, max_v, cable_factor)
     # Update the subnetwork in the dictionary
     dic_of_subs[n]['network'] = tmp_net
@@ -642,9 +698,6 @@ def check_downstream_line_size(subnet: pp.pandapowerNet, line_id: int, cable_cat
     return optimal
 
 
-import warnings
-
-
 def check_high_voltage_nodes(net, voltage_threshold=1.1):
     """
     Checks for high voltage buses not connected to static generators via transformers.
@@ -755,7 +808,7 @@ def fill_result_dataframe(df, t, net):
     return df
 
 
-def perform_timestep_dc_load_flow(net,use_case):
+def perform_timestep_dc_load_flow(net, use_case, node_data):
 
     timestep = use_case['Parameters for annual simulations']['Simulation time step (mins)']
     timelaps = use_case['Parameters for annual simulations']['Simulation period (days)']
@@ -765,14 +818,14 @@ def perform_timestep_dc_load_flow(net,use_case):
     for t in tqdm(range(number_of_timestep)):
         update_network(net, t)
 
-        net=perform_dc_load_flow(net,use_case,PDU_droop_control=True)
-        net = perform_dc_load_flow_with_droop(net, use_case, t, timestep/60)
+        net = perform_dc_load_flow(net, use_case, node_data, PDU_droop_control=True)
+        net = perform_dc_load_flow_with_droop(net, use_case, t, timestep/60, node_data)
         result = fill_result_dataframe(result, t, net)
     
     return net, result
 
  
-def perform_dc_load_flow_with_droop(net: pp.pandapowerNet, use_case: dict, t, time_step_duration) -> pp.pandapowerNet:
+def perform_dc_load_flow_with_droop(net: pp.pandapowerNet, use_case: dict, t, time_step_duration, node_data) -> pp.pandapowerNet:
     """
     Performs DC load flow calculation on the network.
 
@@ -788,7 +841,7 @@ def perform_dc_load_flow_with_droop(net: pp.pandapowerNet, use_case: dict, t, ti
     tol = 1e-2
     it = 0
     max_it = 200
-    net = perform_dc_load_flow(net, use_case, PDU_droop_control=True)
+    net = perform_dc_load_flow(net, use_case, node_data, PDU_droop_control=True)
     bus_voltages_previous = np.zeros(net.res_bus.vm_pu.values.shape)
     bus_voltages = np.zeros(net.res_bus.vm_pu.values.shape)
 
@@ -796,9 +849,9 @@ def perform_dc_load_flow_with_droop(net: pp.pandapowerNet, use_case: dict, t, ti
 
         bus_voltages_previous = bus_voltages
 
-        net, SOC_list = droop_correction(net,t,time_step_duration)
+        net, SOC_list = droop_correction(net, t, time_step_duration)
 
-        net = perform_dc_load_flow(net,use_case,PDU_droop_control=True)
+        net = perform_dc_load_flow(net, use_case, node_data, PDU_droop_control=True)
 
         bus_voltages = net.res_bus.vm_pu.values
         # Computes error
@@ -807,8 +860,8 @@ def perform_dc_load_flow_with_droop(net: pp.pandapowerNet, use_case: dict, t, ti
         it = it + 1
         if it == max_it:
             print('\nout by iteration\n error : ', error)
-    c=0
-    for i,_ in net.storage.iterrows():
+    c = 0
+    for i, _ in net.storage.iterrows():
         if ('Battery' in net.storage.loc[i,'name']):
             soc = SOC_list[c]
             print(SOC_list)
@@ -834,7 +887,7 @@ def droop_correction(net,t,time_step_duration):
     SOC_list = []
     attributes = ['load', 'sgen', 'storage']
     for attr in attributes:
-        for i, _ in getattr(net,attr).iterrows():
+        for i, _ in getattr(net, attr).iterrows():
             voltage_bus, v_asset = get_voltage_bus(i, attr, net)
             droop_curve = get_droop_curve(i, attr, net)
             if (attr == 'storage') and ('Battery' in getattr(net, attr).loc[i, 'name']):
@@ -847,7 +900,7 @@ def droop_correction(net,t,time_step_duration):
 
 
 def get_voltage_bus(i, attr, net):
-    asset_bus = getattr(net,attr).loc[i,'bus']
+    asset_bus = getattr(net,attr).loc[i, 'bus']
     converter_connected = net.converter[(net.converter.from_bus == asset_bus) | (net.converter.to_bus == asset_bus)]
 
     if converter_connected.empty:
