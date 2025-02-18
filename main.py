@@ -1,15 +1,15 @@
 import pandas as pd
 import pandapower as pp
-from create import create_DC_network
-from plot_utilities import plot_network_with_plotly
-from loadflow_utilities import perform_dc_load_flow, perform_load_flow_with_sizing, perform_dc_load_flow_with_droop, perform_timestep_dc_load_flow
-from worst_case_utilities import perform_comprehensive_sizing, validate_network_performance
+from utilities_create import create_DC_network
+from utilities_plot import plot_network_with_plotly
+from utilities_load_flow import perform_dc_load_flow, perform_load_flow_with_sizing, perform_dc_load_flow_with_droop, perform_timestep_dc_load_flow
+from utilities_worst_case_sizing import perform_comprehensive_sizing, validate_network_performance
 
 # Insert the path of the input file
-path = 'grid_data_input_file_building_demo.xlsx'
+path = 'input_file_grid_data.xlsx'
 # Insert the path of the catalogues
-path_cable_catalogue = "cable_catalogue.xlsx"
-path_converter_catalogue = "Converters_Library.xlsx"
+path_cable_catalogue = "catalogue_cable.xlsx"
+path_converter_catalogue = "catalogue_converter.xlsx"
 
 # Read files and create an initial un-sized DC network
 net, cable_catalogue, use_case, node_data = create_DC_network(path, path_cable_catalogue, path_converter_catalogue)

@@ -1,6 +1,6 @@
 import pandapower as pp
-from loadflow_utilities import perform_dc_load_flow, perform_load_flow_with_sizing
-from plot_utilities import plot_network_with_plotly
+from utilities_load_flow import perform_dc_load_flow, perform_load_flow_with_sizing
+from utilities_plot import plot_network_with_plotly
 import copy
 import math
 
@@ -155,8 +155,8 @@ def evaluate_scenario_performance(network, use_case, scenario_name, node_data):
 
     # Perform and visualize load flow
     scenario_network = perform_dc_load_flow(scenario_network, use_case, node_data)
-    pp.to_excel(scenario_network, rf'Sized_network_result_{scenario_name.split(" ")[3]}.xlsx')
-    plot_network_with_plotly(scenario_network)
+    pp.to_excel(scenario_network, rf'output_sized_network_on_scenario_{scenario_name.split(" ")[3]}.xlsx')
+    plot_network_with_plotly(scenario_network, rf'output_plot_sized_network_on_scenario_{scenario_name.split(" ")[3]}.html')
     return scenario_network
 
 

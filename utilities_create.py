@@ -2,10 +2,9 @@ import pandas as pd
 import pandapower as pp
 from ast import literal_eval
 import numpy as np
-from read_cable_catalogue import read_cable_catalogue, process_cable_catalogue
-from reading_utilities import read_UC_Definition
-from topology_utilities import separate_subnetworks, sorting_network, merge_networks
-from load_profile_utilities import generate_load_profile
+from utilities_read import read_UC_Definition, read_cable_catalogue, process_cable_catalogue
+from utilities_net_topology import separate_subnetworks, sorting_network, merge_networks
+from utilities_load_profile import generate_load_profile
 
 
 def create_DC_network(path: str, path_cable_catalogue: str, path_converter_catalogue: str) -> tuple:

@@ -50,7 +50,7 @@ def plot_voltage(net):
     plt.show()
 
 
-def plot_network_with_plotly(net):
+def plot_network_with_plotly(net, file_name):
     net_plot = copy.deepcopy(net)
     for _, row in net_plot.converter.iterrows():
         if row.type != 'ILC':
@@ -110,5 +110,5 @@ def plot_network_with_plotly(net):
                                                                     for i, row in net.res_converter.iterrows()])))
     fig = pplotly.draw_traces(line_trace + trafo_trace + bus_trace,
                               figsize=2, aspectratio=(20, 10),
-                              filename='NetworkEcartLEPlot.html', auto_open=False, showlegend=False)
+                              filename=file_name, auto_open=False, showlegend=False)
     fig.show()

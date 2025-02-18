@@ -9,7 +9,7 @@ import pandapower as pp
 import numpy as np
 import pandas as pd
 from ast import literal_eval
-from topology_utilities import separate_subnetworks, sorting_network, merge_networks, find_lines_between_given_line_and_ext_grid
+from utilities_net_topology import separate_subnetworks, sorting_network, merge_networks, find_lines_between_given_line_and_ext_grid
 from typing import Dict, List
 from tqdm import tqdm
 import warnings
