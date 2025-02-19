@@ -4,6 +4,7 @@ from pandas import Series
 import pandas as pd
 import pandapower as pp
 import copy
+import plotly.graph_objects as go
 
 
 def plot_voltage(net):
@@ -52,6 +53,7 @@ def plot_voltage(net):
 
 def plot_network_with_plotly(net, file_name):
     net_plot = copy.deepcopy(net)
+    # Add equivalent transformers for visualization
     for _, row in net_plot.converter.iterrows():
         if row.type != 'ILC':
             V1 = net_plot.bus.vn_kv.loc[net_plot.bus.index == row.from_bus].values[0]
@@ -66,10 +68,14 @@ def plot_network_with_plotly(net, file_name):
                                                       sn_mva=row.P, vn_hv_kv=V2, vn_lv_kv=V1,
                                                       vkr_percent=0, vk_percent=0, pfe_kw=0, i0_percent=0)
 
-    # Create a figure plotly
+    # Create coordinates
     pplotly.create_generic_coordinates(net_plot, mg=None, library='igraph', respect_switches=True,
                                        trafo_length_km=0.0000001, geodata_table='bus_geodata', buses=None, overwrite=True)
+
+    # Create base figure
     fig = pplotly.simple_plotly(net_plot, auto_open=False)
+
+    # Line trace
     '''line_trace = pplotly.create_line_trace(net_plot, cmap="jet", cmap_vals=net_plot.res_line.loading_percent, width=4.0,
                                            infofunc=(Series(index=net.line.index,
                                                             data=[f'I : {row.i_ka*1000:.1f} A <br>loading : {row.loading_percent:.1f} % <br> cable_rank : {net.line.loc[i,"cable_rank"]} % <br> section : {net.line.loc[i,"section"]}' for i, row in net.res_line.iterrows()]
@@ -108,7 +114,44 @@ def plot_network_with_plotly(net, file_name):
                                                                     f'Losses: {row.pl_mw * 1000:.1f} kW <br>'
                                                                     f'Loading: {net.res_converter.loc[i, "loading (%)"]:.1f} %'
                                                                     for i, row in net.res_converter.iterrows()])))
-    fig = pplotly.draw_traces(line_trace + trafo_trace + bus_trace,
+
+    # Add text for bus numbers
+    bus_text = go.Scatter(
+        x=[net_plot.bus_geodata.x.loc[i] for i in net_plot.bus.index],
+        y=[net_plot.bus_geodata.y.loc[i]+0.1 for i in net_plot.bus.index],
+        mode="text",
+        text=[str(i) for i in net_plot.bus.index],
+        textposition="top right",
+        showlegend=False
+    )
+
+    # Add text for line sections
+    line_text = go.Scatter(
+        x=[(net_plot.bus_geodata.x.loc[net.line.loc[i, "from_bus"]] + net_plot.bus_geodata.x.loc[
+            net.line.loc[i, "to_bus"]]) / 2 for i in net.line.index],
+        y=[(net_plot.bus_geodata.y.loc[net.line.loc[i, "from_bus"]] + net_plot.bus_geodata.y.loc[
+            net.line.loc[i, "to_bus"]]) / 2 + 0.1 for i in net.line.index],
+        mode="text",
+        text=[f'{net.line.loc[i, "section"]} mm²' for i in net.line.index],
+        textposition="top center",
+        showlegend=False
+    )
+
+    # Add text for converter installed power
+    converter_text = go.Scatter(
+        x=[(net_plot.bus_geodata.x.loc[net.converter.loc[i, "from_bus"]] + net_plot.bus_geodata.x.loc[
+            net.converter.loc[i, "to_bus"]]) / 2 for i in net.converter.index],
+        y=[(net_plot.bus_geodata.y.loc[net.converter.loc[i, "from_bus"]] + net_plot.bus_geodata.y.loc[
+            net.converter.loc[i, "to_bus"]]) / 2 + 0.2 for i in net.converter.index],
+        mode="text",
+        text=[f'{net.converter.loc[i, "P"] * 1000:.1f} kW' for i in net.converter.index],
+        textposition="bottom center",
+        showlegend=False
+    )
+
+    # Draw plot with legend
+    fig = pplotly.draw_traces(line_trace + trafo_trace + bus_trace + [bus_text] + [line_text] + [converter_text],
                               figsize=2, aspectratio=(20, 10),
                               filename=file_name, auto_open=False, showlegend=False)
+
     fig.show()
