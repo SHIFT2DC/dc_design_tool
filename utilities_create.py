@@ -144,7 +144,7 @@ def _create_buses_and_components(net: pp.pandapowerNet, node_data: pd.DataFrame,
                 bus=bus,
                 p_mw=row['Maximum power (kW)'] / 1000,  # Convert kW to MW
                 max_e_mwh=row['Maximum power (kW)'] / 1000 * 4,  # Convert kWh to MWh
-                soc_percent=100  # Initial state of charge at 50%
+                soc_percent=100  # Initial state of charge
             )
 
             if 'p_nom_mw' not in net.storage.columns:

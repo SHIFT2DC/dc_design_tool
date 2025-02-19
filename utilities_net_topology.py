@@ -187,6 +187,7 @@ def find_lines_between_given_line_and_ext_grid(net, line_id):
     
     # Find the indices of the corresponding lines
     for line in lines:
-        lines_index.append(net.line.loc[((net.line.from_bus == line[1]) & (net.line.to_bus == line[0])) | ((net.line.from_bus == line[0]) & (net.line.to_bus == line[1]))].index[0])
+        lines_index.append(net.line.loc[((net.line.from_bus == line[1]) & (net.line.to_bus == line[0])) |
+                                        ((net.line.from_bus == line[0]) & (net.line.to_bus == line[1]))].index[0])
     
     return lines_index

@@ -5,6 +5,7 @@ import pandas as pd
 import pandapower as pp
 import copy
 import plotly.graph_objects as go
+import plotly.express as px
 
 
 def plot_voltage(net):
@@ -60,17 +61,43 @@ def plot_network_with_plotly(net, node_data, file_name):
             V2 = net_plot.bus.vn_kv.loc[net_plot.bus.index == row.to_bus].values[0]
 
             if V1 > V2:
-                pp.create_transformer_from_parameters(net_plot, hv_bus=row.from_bus, lv_bus=row.to_bus,
-                                                      sn_mva=row.P, vn_hv_kv=V1, vn_lv_kv=V2,
-                                                      vkr_percent=0, vk_percent=0, pfe_kw=0,i0_percent=0)
+                pp.create_transformer_from_parameters(
+                    net_plot,
+                    hv_bus=row.from_bus,
+                    lv_bus=row.to_bus,
+                    sn_mva=row.P,
+                    vn_hv_kv=V1,
+                    vn_lv_kv=V2,
+                    vkr_percent=0,
+                    vk_percent=0,
+                    pfe_kw=0,
+                    i0_percent=0
+                )
             else:
-                pp.create_transformer_from_parameters(net_plot, hv_bus=row.to_bus, lv_bus=row.from_bus,
-                                                      sn_mva=row.P, vn_hv_kv=V2, vn_lv_kv=V1,
-                                                      vkr_percent=0, vk_percent=0, pfe_kw=0, i0_percent=0)
+                pp.create_transformer_from_parameters(
+                    net_plot,
+                    hv_bus=row.to_bus,
+                    lv_bus=row.from_bus,
+                    sn_mva=row.P,
+                    vn_hv_kv=V2,
+                    vn_lv_kv=V1,
+                    vkr_percent=0,
+                    vk_percent=0,
+                    pfe_kw=0,
+                    i0_percent=0
+                )
 
     # Create coordinates
-    pplotly.create_generic_coordinates(net_plot, mg=None, library='igraph', respect_switches=True,
-                                       trafo_length_km=0.0000001, geodata_table='bus_geodata', buses=None, overwrite=True)
+    pplotly.create_generic_coordinates(
+        net_plot,
+        mg=None,
+        library='igraph',
+        respect_switches=True,
+        trafo_length_km=0.0000001,
+        geodata_table='bus_geodata',
+        buses=None,
+        overwrite=True
+    )
 
     # Create base figure
     fig = pplotly.simple_plotly(net_plot, auto_open=False)
@@ -162,8 +189,26 @@ def plot_network_with_plotly(net, node_data, file_name):
     )
 
     # Draw plot with legend
-    fig = pplotly.draw_traces(line_trace + trafo_trace + bus_trace + [bus_text] + [line_text] + [converter_text],
-                              figsize=2, aspectratio=(20, 10),
-                              filename=file_name, auto_open=False, showlegend=False)
+    fig = pplotly.draw_traces(
+        line_trace + trafo_trace + bus_trace + [bus_text] + [line_text] + [converter_text],
+        figsize=2,
+        aspectratio=(20, 10),
+        filename=file_name,
+        auto_open=False,
+        showlegend=False
+    )
 
     fig.show()
+
+
+def plot_bus_voltage_heatmap(net, scenario_name):
+    fig = px.bar(
+        x=net.bus.index,
+        y=net.res_bus.vm_pu,
+        color=net.res_bus.vm_pu,
+        labels={'x': 'Bus Index', 'y': 'Voltage (p.u.)'},
+        title=rf'Bus Voltage Levels in scenario {scenario_name.split(" ")[3]}'
+    )
+    fig.show()
+    fig.write_html(rf'output_voltage_bars_scenario_{scenario_name.split(" ")[3]}.html')
+

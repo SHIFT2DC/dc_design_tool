@@ -9,7 +9,8 @@ import pandapower as pp
 import numpy as np
 import pandas as pd
 from ast import literal_eval
-from utilities_net_topology import separate_subnetworks, sorting_network, merge_networks, find_lines_between_given_line_and_ext_grid
+from utilities_net_topology import (separate_subnetworks, sorting_network, merge_networks,
+                                    find_lines_between_given_line_and_ext_grid)
 from typing import Dict, List
 from tqdm import tqdm
 import warnings
@@ -116,7 +117,8 @@ def add_upstream_ext_grids(network_dict: Dict, network_id: int, tmp_net: pp.pand
         bus = [x[1] for x in network_dict[upstream[0]]['direct_downstream_network']
                if x[0] == network_id][0]
         v = 1.0
-        if (not network_dict[upstream[0]]['network'].res_bus.empty) and (net.converter.loc[net.converter['name'] == upstream[2], 'type'].str.contains('PDU').values[0]):
+        if ((not network_dict[upstream[0]]['network'].res_bus.empty) and
+                (net.converter.loc[net.converter['name'] == upstream[2], 'type'].str.contains('PDU').values[0])):
             v = max(0.98, network_dict[upstream[0]]['network'].res_bus.loc[upstream[1], 'vm_pu'])
             v = min(1.02, v)
             
@@ -173,7 +175,8 @@ def add_load_to_upstream(up_net: pp.pandapowerNet, bus: int, adjusted_power: flo
         )
 
 
-def update_converter_results(net: pp.pandapowerNet, converter_name: str, adjusted_power: float, power: float, power_loss: float) -> None:
+def update_converter_results(net: pp.pandapowerNet, converter_name: str, adjusted_power: float,
+                             power: float, power_loss: float) -> None:
     """
     Updates the converter results in the main network.
 
@@ -185,11 +188,14 @@ def update_converter_results(net: pp.pandapowerNet, converter_name: str, adjuste
         power_loss (float): The power loss.
     """
     net.res_converter.loc[net.converter.name == converter_name, 'p_mw'] = adjusted_power
-    net.res_converter.loc[net.converter.name == converter_name, 'loading (%)'] = power / net.converter.loc[net.converter.name == converter_name, 'P'] * 100
+    net.res_converter.loc[net.converter.name == converter_name, 'loading (%)'] = (
+            power / net.converter.loc[net.converter.name == converter_name, 'P'] * 100
+    )
     net.res_converter.loc[net.converter.name == converter_name, 'pl_mw'] = power_loss
 
 
-def process_subnetwork(network_id: int, network_dict: Dict, loadflowed_subs: List[int], net: pp.pandapowerNet, node_data) -> None:
+def process_subnetwork(network_id: int, network_dict: Dict, loadflowed_subs: List[int],
+                       net: pp.pandapowerNet, node_data) -> None:
     """
     Processes a single subnetwork in the DC load flow calculation.
 
@@ -346,7 +352,8 @@ def all_downstream_processed(network_dict: Dict, network_id: int, loadflowed_sub
     )
 
 
-def perform_load_flow_with_sizing(net: pp.pandapowerNet, cable_catalogue: pd.DataFrame, use_case: Dict, node_data) -> pp.pandapowerNet:
+def perform_load_flow_with_sizing(net: pp.pandapowerNet, cable_catalogue: pd.DataFrame, use_case: Dict,
+                                  node_data) -> pp.pandapowerNet:
     """
     Performs DC load flow calculation with sizing adjustments for converters and cables.
 
@@ -409,7 +416,8 @@ def define_sizing_security_factor(use_case: Dict) -> tuple:
     return cable_factor, AC_DC_factor, converter_factor
 
 
-def process_subnetworks_with_cable_sizing(net: pp.pandapowerNet, cable_catalogue: pd.DataFrame, min_v: float, max_v: float, cable_factor: int, node_data) -> pp.pandapowerNet:
+def process_subnetworks_with_cable_sizing(net: pp.pandapowerNet, cable_catalogue: pd.DataFrame, min_v: float,
+                                          max_v: float, cable_factor: int, node_data) -> pp.pandapowerNet:
     """
     Processes all subnetworks and adjusts cable sizing based on load flow results.
 
@@ -431,13 +439,16 @@ def process_subnetworks_with_cable_sizing(net: pp.pandapowerNet, cable_catalogue
     while not all(sub in loadflowed_subs for sub in dic_of_subs.keys()):
         for n in set(dic_of_subs.keys()) - set(loadflowed_subs):
             if all_downstream_processed(dic_of_subs, n, loadflowed_subs):
-                process_single_subnetwork_with_cable_sizing(dic_of_subs, n, cable_catalogue, min_v, max_v, loadflowed_subs, net, cable_factor, node_data)
+                process_single_subnetwork_with_cable_sizing(dic_of_subs, n, cable_catalogue, min_v, max_v,
+                                                            loadflowed_subs, net, cable_factor, node_data)
     
     net_res = merge_networks([dic_of_subs[n]['network'] for n in dic_of_subs.keys()])
     return clean_network(net_res, net)
     
 
-def process_single_subnetwork_with_cable_sizing(dic_of_subs: Dict, n: int, cable_catalogue: pd.DataFrame, min_v: float, max_v: float, loadflowed_subs: List[int], net: pp.pandapowerNet, cable_factor: int, node_data) -> None:
+def process_single_subnetwork_with_cable_sizing(dic_of_subs: Dict, n: int, cable_catalogue: pd.DataFrame, min_v: float,
+                                                max_v: float, loadflowed_subs: List[int], net: pp.pandapowerNet,
+                                                cable_factor: int, node_data) -> None:
     """
     Processes a single subnetwork and adjusts cable sizing.
 
@@ -456,14 +467,11 @@ def process_single_subnetwork_with_cable_sizing(dic_of_subs: Dict, n: int, cable
     # Add external grids for upstream connections
     add_upstream_ext_grids_for_sizing(dic_of_subs, n, tmp_net)
 
-    # Run power flow a
+    # Run a power flow
     pp.runpp(tmp_net)
 
     # Adjust results if network contains 1 bus
     if len(tmp_net.bus) == 1:
-        #path = 'grid_data_input_file_building_demo.xlsx'
-        #xl_file = pd.ExcelFile(path)
-        #node_data = xl_file.parse('Assets Nodes')
         bus_idx = tmp_net.bus.index.values[0]
         matching_row = node_data.loc[node_data['Node number'] == bus_idx]
         matching_row['Component type'] = matching_row['Component type'].str.replace(' ', '').str.lower()
@@ -542,7 +550,8 @@ def adjust_converter_sizing(net: pp.pandapowerNet, AC_DC_factor: int, converter_
     for i in net.converter.index:
         if net.converter.loc[i, 'conv_rank'] is not None:
             tmp_cc = net.converter.loc[i, 'converter_catalogue']
-            new_c, new_conv_rank = select_converter_based_on_power(tmp_cc, net.res_converter.loc[i, 'p_mw'], AC_DC_factor, converter_factor)
+            new_c, new_conv_rank = select_converter_based_on_power(tmp_cc, net.res_converter.loc[i, 'p_mw'],
+                                                                   AC_DC_factor, converter_factor)
             update_converter_efficiency_curve(net, i, new_c)
             update_converter_attributes(net, i, new_c, int(new_conv_rank))
 
@@ -565,7 +574,8 @@ def select_converter_based_on_power(tmp_cc: pd.DataFrame, power_mw: float, AC_DC
     if (tmp_cc['Nominal power (kW)']*(1-factor/100) > abs(power_mw * 1000)).values.any():
         # Find new converter with minimum capacity above required power
         filtered_tmp_cc = tmp_cc[tmp_cc['Nominal power (kW)']*(1-factor/100) > abs(power_mw * 1000)]
-        return filtered_tmp_cc.loc[filtered_tmp_cc['Nominal power (kW)'].idxmin()], filtered_tmp_cc['Nominal power (kW)'].idxmin()
+        return (filtered_tmp_cc.loc[filtered_tmp_cc['Nominal power (kW)'].idxmin()],
+                filtered_tmp_cc['Nominal power (kW)'].idxmin())
     else:
         # Otherwise, select the largest converter
         return tmp_cc.loc[tmp_cc['Nominal power (kW)'].idxmax()], tmp_cc['Nominal power (kW)'].idxmax()
@@ -608,7 +618,8 @@ def update_converter_attributes(net: pp.pandapowerNet, i: int, new_c: pd.Series,
     net.converter.loc[i, 'P'] = new_c['Nominal power (kW)'] / 1000
 
 
-def adjust_cable_sizing(subnet: pp.pandapowerNet, cable_catalogue: pd.DataFrame, min_v: float, max_v: float, cable_factor: int) -> None:
+def adjust_cable_sizing(subnet: pp.pandapowerNet, cable_catalogue: pd.DataFrame, min_v: float, max_v: float,
+                        cable_factor: int) -> None:
     """
     Adjusts the sizing of cables based on the load flow results.
 
@@ -625,7 +636,8 @@ def adjust_cable_sizing(subnet: pp.pandapowerNet, cable_catalogue: pd.DataFrame,
                 optimal = adjust_single_cable(subnet, line_id, cable_catalogue, min_v, cable_factor)
 
 
-def adjust_single_cable(subnet: pp.pandapowerNet, line_id: int, cable_catalogue: pd.DataFrame, min_v: float, cable_factor: int) -> bool:
+def adjust_single_cable(subnet: pp.pandapowerNet, line_id: int, cable_catalogue: pd.DataFrame, min_v: float,
+                        cable_factor: int) -> bool:
     """
     Adjusts the sizing of a single cable.
 
@@ -755,6 +767,7 @@ def update_network(net, t):
             else:
                 print('WARNING INCORRECT Number of timestep in User-define profile')
                 net.sgen.loc[i, 'p_mw'] = net.sgen.loc[i, 'power_profile'][-1]*net.sgen.loc[i, 'p_nom_mw']
+
     for i, _ in net.storage.iterrows():
         if not np.isnan(net.storage.loc[i, 'power_profile']).any():
             if t < len(net.storage.loc[i, 'power_profile']):
@@ -924,7 +937,7 @@ def get_droop_curve(i, attr, net):
         if np.isnan(net.load.loc[i, 'droop_curve']).any():
             droop_curve = np.array([[1.5,1], [1.1,1], [1,1], [1,1], [0.99,1], [0.95,1]])
         else:
-            droop_curve = net.load.loc[i,'droop_curve']
+            droop_curve = net.load.loc[i, 'droop_curve']
     else:
         converter_id = converter_connected.index[0]
         if net.converter.loc[converter_id, 'droop_curve'] is None:

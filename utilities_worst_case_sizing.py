@@ -70,7 +70,7 @@ def apply_battery_specifications(network, battery_specs):
     """
     for name, specs in battery_specs.items():
         battery_mask = network.storage['name'] == name
-        network.storage.loc[battery_mask, 'p_mw'] = 0
+        network.storage.loc[battery_mask, 'p_mw'] = abs(specs['power_kw'] / 1000)
         network.storage.loc[battery_mask, 'max_e_mwh'] = abs(specs['energy_kwh'] / 1000)
         network.storage.loc[battery_mask, 'p_nom_mw'] = abs(specs['power_kw'] / 1000)
 
@@ -78,7 +78,7 @@ def apply_battery_specifications(network, battery_specs):
 def create_scenario_network(network, cable_catalogue, use_case, scenario_name, node_data):
     """
     Creates a network configuration for a given scenario by adjusting components (loads, generation, storage, etc.)
-    based on the scenario's parameters and sizing factors..
+    based on the scenario's parameters and sizing factors.
     
     Args:
         network (pp.Network): Base network model
@@ -156,7 +156,7 @@ def evaluate_scenario_performance(network, use_case, scenario_name, node_data):
     # Perform and visualize load flow
     scenario_network = perform_dc_load_flow(scenario_network, use_case, node_data)
     pp.to_excel(scenario_network, rf'output_sized_network_on_scenario_{scenario_name.split(" ")[3]}.xlsx')
-    plot_network_with_plotly(scenario_network, rf'output_plot_sized_network_on_scenario_{scenario_name.split(" ")[3]}.html')
+    plot_network_with_plotly(scenario_network, node_data, rf'output_plot_sized_network_on_scenario_{scenario_name.split(" ")[3]}.html')
     return scenario_network
 
 
@@ -213,7 +213,7 @@ def perform_comprehensive_sizing(network, cable_catalogue, use_case, node_data):
         'Worst case scenario 3 for sizing cables and AC/DC converter', node_data)
     
     # Combine results from all scenarios
-    combined_network = merge_network_components(scenario2_network,storage_network)
+    combined_network = merge_network_components(scenario2_network, storage_network)
     final_network = merge_network_components(combined_network, scenario3_network)
     
     return final_network
