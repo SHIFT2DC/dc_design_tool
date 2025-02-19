@@ -343,20 +343,22 @@ def _create_converters(net: pp.pandapowerNet, converter_data: pd.DataFrame, conv
 
     for _, row in converter_data.iterrows():
         if not np.isnan(row['Nominal power (kW)']):
-            _add_converter(net, row, converter_default)
+            _add_converter(net, row, converter_catalogue, converter_default)
         else:
             _add_converter_from_catalogue(net, row, converter_catalogue, converter_default)
 
 
-def _add_converter(net: pp.pandapowerNet, row: pd.Series, converter_default: pd.DataFrame) -> None:
+def _add_converter(net: pp.pandapowerNet, row: pd.Series, converter_catalogue: pd.DataFrame, converter_default: pd.DataFrame) -> None:
     """
     Adds a converter to the network based on the provided row data.
 
     Args:
         net (pp.pandapowerNet): The pandapower network.
         row (pd.Series): Row containing converter data.
+        converter_catalogue (pd.DataFrame): DataFrame containing converter catalogue data.
         converter_default (pd.DataFrame): DataFrame containing default converter data.
     """
+
     # Create buses if they don't exist
     for bus_key in ['from_bus', 'to_bus']:
         if row[bus_key] not in net.bus.index:
@@ -374,6 +376,11 @@ def _add_converter(net: pp.pandapowerNet, row: pd.Series, converter_default: pd.
                 net.bus.loc[row[bus_key], 'vn_kv'] = row[voltage_key] / 1000
 
     # Calculate efficiency and droop curves
+    if row['Efficiency curve'] == 'default':
+        type_c = row['type']
+        tmp_cc = converter_catalogue.loc[converter_catalogue['Converter type'] == type_c].copy()
+        conv = tmp_cc.loc[tmp_cc['Nominal power (kW)'].idxmin()]
+        row['efficiency curve'] = conv['Efficiency curve [Xi;Yi], i={1,2,3,4}, \nwith X= Factor of Nominal Power (%), Y=Efficiency (%)']
     efficiency = _calculate_efficiency(row)
     droop_curve = _calculate_droop_curve(row, converter_default)
 
@@ -472,13 +479,13 @@ def _calculate_efficiency(row: pd.Series, conv: pd.Series = None) -> np.ndarray:
     if row['Efficiency curve'] == 'user-defined':
         eff = np.array(literal_eval(row['efficiency curve']))
         e = eff[:, 1].astype('float') / 100
-        p = eff[:, 0] / 100 * (row['Nominal Maximum power (kW)'] if conv is None else conv['Nominal power (kW)'])
+        p = eff[:, 0] / 100 * (row['Nominal power (kW)'] if conv is None else conv['Nominal power (kW)'])
         return np.vstack((p, e)).T
     else:
-        eff_str = conv['Efficiency curve [Xi;Yi], i={1,2,3,4}, \nwith X= Factor of Nominal Power (%), Y=Efficiency (%)']
+        eff_str = row['efficiency curve'] if conv is None else conv['Efficiency curve [Xi;Yi], i={1,2,3,4}, \nwith X= Factor of Nominal Power (%), Y=Efficiency (%)']
         eff = np.array(literal_eval('[' + eff_str.replace(';', ',') + ']'))
         e = eff[:, 1].astype('float') / 100
-        p = eff[:, 0] / 100 * conv['Nominal power (kW)']
+        p = eff[:, 0] / 100 * (row['Nominal power (kW)'] if conv is None else conv['Nominal power (kW)'])
         return np.vstack((p, e)).T
 
 
