@@ -369,6 +369,7 @@ def perform_load_flow_with_sizing(net: pp.pandapowerNet, cable_catalogue: pd.Dat
     # Step 1: Define voltage limits based on the use case
     min_v, max_v = define_voltage_limits(use_case)
     cable_factor, AC_DC_factor, converter_factor = define_sizing_security_factor(use_case)
+
     # Step 2: Perform initial DC load flow analysis
     net = perform_dc_load_flow(net, use_case, node_data, PDU_droop_control=False)
 

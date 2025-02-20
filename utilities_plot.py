@@ -109,6 +109,8 @@ def plot_network_with_plotly(net, node_data, file_name):
         cmap_vals=net_plot.res_line.loading_percent,
         width=4.0,
         cbar_title="Line Loading (%)",
+        cmin=5,
+        cmax=100,
         infofunc=(Series(index=net.line.index,
                          data=[f'Line from {net.line.loc[i, "from_bus"]} bus to bus {net.line.loc[i, "to_bus"]} <br>'
                                f'Section: {net.line.loc[i, "section"]} mm² <br>'
@@ -128,6 +130,8 @@ def plot_network_with_plotly(net, node_data, file_name):
         cmap_vals=net_plot.res_bus.vm_pu,
         size=10,
         cbar_title="Bus Voltage (p.u.)",
+        cmin=0.9,
+        cmax=1.1,
         infofunc=(Series(index=net.bus.index,
                          data=[f'Bus {s1} <br>'
                                f'Voltage: {s2:.3f} pu <br>'
