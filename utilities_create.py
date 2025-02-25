@@ -103,7 +103,7 @@ def _create_buses_and_components(net: pp.pandapowerNet, node_data: pd.DataFrame,
                 if 'droop_curve' not in net.load.columns:
                     net.load['droop_curve'] = np.nan
                     net.load['droop_curve'] = net.load['droop_curve'].astype('object')
-                str_dc = converter_default.loc[converter_default['Converter type'] == row['Component type'],'Default Droop curve'].values[0]
+                str_dc = converter_default.loc[converter_default['Converter type'] == row['Component type'], 'Default Droop curve'].values[0]
                 net.load.at[l, 'droop_curve'] = np.array(literal_eval('[' + str_dc.replace(';', ',') + ']'))
             
             if 'p_nom_mw' not in net.load.columns:
@@ -131,10 +131,10 @@ def _create_buses_and_components(net: pp.pandapowerNet, node_data: pd.DataFrame,
                     net.load['default_power_profile'] = net.load['default_power_profile'].astype('object')
 
                 net.load.at[l, 'default_power_profile'] = default_assets_profile[row['Asset profile type']].values
-                _, load_profile, _ = generate_load_profile(timelaps, timestep, net.load.at[l, 'default_power_profile'], noise_std=0.1,
-                                                                        summer_coeficient=0.95,winter_coeficient=1.1,
-                                                                        holiday_coefficient=1/5,weekend_coeficent=1/20,
-                                                                        day_varation_sigma=0.1)
+                _, load_profile, _ = generate_load_profile(timelaps, timestep, net.load.at[l, 'default_power_profile'],
+                                                           noise_std=0.1, summer_coeficient=0.95, winter_coeficient=1.1,
+                                                           holiday_coefficient=1/5, weekend_coeficent=1/20,
+                                                           day_varation_sigma=0.1)
                 net.load.at[l, 'power_profile'] = load_profile
 
         elif component_type == 'ev':
@@ -401,7 +401,8 @@ def _add_converter(net: pp.pandapowerNet, row: pd.Series, converter_catalogue: p
     net.converter.loc[len(net.converter)] = new_row
 
 
-def _add_converter_from_catalogue(net: pp.pandapowerNet, row: pd.Series, converter_catalogue: pd.DataFrame, converter_default: pd.DataFrame) -> None:
+def _add_converter_from_catalogue(net: pp.pandapowerNet, row: pd.Series, converter_catalogue: pd.DataFrame,
+                                  converter_default: pd.DataFrame) -> None:
     """
     Adds a converter to the network based on the converter catalogue.
 

@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 from ast import literal_eval
 from utilities_net_topology import (separate_subnetworks, sorting_network, merge_networks,
-                                    find_lines_between_given_line_and_ext_grid)
+                                    find_lines_between_given_line_and_ext_grid, get_bus_distances)
 from typing import Dict, List
 from tqdm import tqdm
 import warnings
@@ -623,6 +623,7 @@ def adjust_cable_sizing(subnet: pp.pandapowerNet, cable_catalogue: pd.DataFrame,
                         cable_factor: int) -> None:
     """
     Adjusts the sizing of cables based on the load flow results.
+    Adjusts from upstream to downstream
 
     Args:
         subnet (pp.pandapowerNet): The subnetwork to adjust.
@@ -630,11 +631,26 @@ def adjust_cable_sizing(subnet: pp.pandapowerNet, cable_catalogue: pd.DataFrame,
         min_v (float): Minimum voltage limit.
         max_v (float): Maximum voltage limit.
     """
-    for line_id in subnet.res_line.i_ka.sort_values(ascending=False).index:
-        if not np.isnan(subnet.line.loc[line_id,'cable_rank']):
+
+    # Compute distances of buses from the slack bus
+    bus_distances = get_bus_distances(subnet)
+
+    # Assign a distance to each line (minimum of its two connected buses)
+    subnet.line["distance"] = subnet.line.apply(lambda row: min(bus_distances.get(row.from_bus, np.inf),
+                                                                bus_distances.get(row.to_bus, np.inf)), axis=1)
+
+    # Sort lines by distance (ascending) to process from upstream (closer to slack) to downstream
+    for line_id in subnet.line.sort_values(by="distance", ascending=True).index:
+        if not np.isnan(subnet.line.loc[line_id, 'cable_rank']):
             optimal = False
             while not optimal:
                 optimal = adjust_single_cable(subnet, line_id, cable_catalogue, min_v, cable_factor)
+
+    '''for line_id in subnet.res_line.i_ka.sort_values(ascending=False).index:
+        if not np.isnan(subnet.line.loc[line_id, 'cable_rank']):
+            optimal = False
+            while not optimal:
+                optimal = adjust_single_cable(subnet, line_id, cable_catalogue, min_v, cable_factor)'''
 
 
 def adjust_single_cable(subnet: pp.pandapowerNet, line_id: int, cable_catalogue: pd.DataFrame, min_v: float,

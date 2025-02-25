@@ -191,3 +191,20 @@ def find_lines_between_given_line_and_ext_grid(net, line_id):
                                         ((net.line.from_bus == line[0]) & (net.line.to_bus == line[1]))].index[0])
     
     return lines_index
+
+
+def get_bus_distances(net):
+    """
+    Compute electrical distances from the slack bus using the shortest path.
+    Returns a dictionary {bus_id: distance}.
+    """
+    # Create graph representation of the grid
+    G = pp.topology.create_nxgraph(net)
+
+    # Identify the slack bus
+    slack_bus = net.ext_grid.bus.values[0]
+
+    # Compute distances
+    distances = nx.single_source_shortest_path_length(G, slack_bus)
+
+    return distances
