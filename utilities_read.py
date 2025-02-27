@@ -65,7 +65,6 @@ def process_cable_catalogue(catalogue, cable_info):
     Returns:
     pd.DataFrame: The processed cable catalogue.
     """
-    print(cable_info)
     # Extract temperature, material, and isolation type from cable_info
     op_temp = cable_info['Operating temperature (degrees Celsius)']
     mat = cable_info['Material ']

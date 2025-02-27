@@ -82,7 +82,7 @@ def calculate_converter_power(power: float, converter: pd.Series) -> tuple:
     adjusted_power = power * efficiency if power < 0 else power / efficiency
     adjusted_power = adjusted_power + converter['stand_by_loss'].iloc[0]
     # Calculate power loss
-    power_loss = power - adjusted_power
+    power_loss = abs(power - adjusted_power)
     return adjusted_power, efficiency, power_loss
 
 
@@ -815,23 +815,23 @@ def format_result_dataframe(df, net):
 
 def fill_result_dataframe(df, t, net):
     for i, row in net.bus.iterrows():
-        df.loc[t, f'node {i} : v_pu'] = net.res_bus.loc[i, 'vm_pu']
+        df.loc[t, f'node {i}: v_pu'] = net.res_bus.loc[i, 'vm_pu']
     for i, row in net.line.iterrows():
-        df.loc[t, f'line {row.from_bus} - {row.to_bus} : i_ka'] = net.res_line.loc[i, 'i_ka']
-        df.loc[t, f'line {row.from_bus} - {row.to_bus} : loading'] = net.res_line.loc[i, 'loading_percent']
-        df.loc[t, f'line {row.from_bus} - {row.to_bus} : pl_mw'] = net.res_line.loc[i, 'pl_mw']
+        df.loc[t, f'line {row.from_bus} - {row.to_bus}: i_ka'] = net.res_line.loc[i, 'i_ka']
+        df.loc[t, f'line {row.from_bus} - {row.to_bus}: loading'] = net.res_line.loc[i, 'loading_percent']
+        df.loc[t, f'line {row.from_bus} - {row.to_bus}: pl_mw'] = net.res_line.loc[i, 'pl_mw']
     for i, row in net.load.iterrows():
-        df.loc[t, f'load {row["name"]} : p_mw'] = net.res_load.loc[i, 'p_mw']
+        df.loc[t, f'load {row["name"]}: p_mw'] = net.res_load.loc[i, 'p_mw']
     for i, row in net.sgen.iterrows():
-        df.loc[t, f'sgen {row["name"]} : p_mw'] = net.res_sgen.loc[i, 'p_mw']
+        df.loc[t, f'sgen {row["name"]}: p_mw'] = net.res_sgen.loc[i, 'p_mw']
     for i, row in net.storage.iterrows():
-        df.loc[t, f'storage {row["name"]} : p_mw'] = net.res_storage.loc[i, 'p_mw']
+        df.loc[t, f'storage {row["name"]}: p_mw'] = net.res_storage.loc[i, 'p_mw']
         if "Battery" in row["name"]:
-            df.loc[t, f'storage {row["name"]} : SOC'] = net.storage.loc[i, 'soc_percent']
+            df.loc[t, f'storage {row["name"]}: SOC'] = net.storage.loc[i, 'soc_percent']
     for i, row in net.converter.iterrows():
-        df.loc[t, f'{row["name"]} : p_mw'] = net.res_converter.loc[i, 'p_mw']
-        df.loc[t, f'{row["name"]} : loading'] = net.res_converter.loc[i, 'loading (%)']
-        df.loc[t, f'{row["name"]} : pl_mw'] = net.res_converter.loc[i, 'pl_mw']
+        df.loc[t, f'{row["name"]}: p_mw'] = net.res_converter.loc[i, 'p_mw']
+        df.loc[t, f'{row["name"]}: loading'] = net.res_converter.loc[i, 'loading (%)']
+        df.loc[t, f'{row["name"]}: pl_mw'] = net.res_converter.loc[i, 'pl_mw']
     return df
 
 
@@ -840,16 +840,22 @@ def perform_timestep_dc_load_flow(net, use_case, node_data):
     timestep = use_case['Parameters for annual simulations']['Simulation time step (mins)']
     timelaps = use_case['Parameters for annual simulations']['Simulation period (days)']
     number_of_timestep = int(timelaps*24*60/timestep)
-    result = pd.DataFrame(index=range(number_of_timestep))
+
+    results = pd.DataFrame(index=range(number_of_timestep))
+    net_snapshots = []  # Store network state at each time step
 
     for t in tqdm(range(number_of_timestep)):
+        # Update network at time step t
         update_network(net, t)
-
+        # Perform Load flow
         net = perform_dc_load_flow(net, use_case, node_data, PDU_droop_control=True)
         net = perform_dc_load_flow_with_droop(net, use_case, t, timestep/60, node_data)
-        result = fill_result_dataframe(result, t, net)
+        # Store network snapshot
+        net_snapshots.append(net.deepcopy())
+        # Fill results
+        results = fill_result_dataframe(results, t, net)
     
-    return net, result
+    return net_snapshots, results
 
  
 def perform_dc_load_flow_with_droop(net: pp.pandapowerNet, use_case: dict, t, time_step_duration, node_data) -> pp.pandapowerNet:
@@ -869,7 +875,7 @@ def perform_dc_load_flow_with_droop(net: pp.pandapowerNet, use_case: dict, t, ti
     nb_it = 0
     # Define tolerance
     tol = 1e-2
-    max_it = 200
+    max_it = 3
 
     # Perform initial load flow
     net = perform_dc_load_flow(net, use_case, node_data, PDU_droop_control=True)
@@ -877,7 +883,7 @@ def perform_dc_load_flow_with_droop(net: pp.pandapowerNet, use_case: dict, t, ti
     bus_voltages_previous = np.zeros(net.res_bus.vm_pu.values.shape)
     bus_voltages = np.zeros(net.res_bus.vm_pu.values.shape)
 
-    while (abs(error) > tol) and (nb_it < 5):
+    while (abs(error) > tol) and (nb_it < max_it):
 
         bus_voltages_previous = bus_voltages
         net, soc_list = droop_correction(net, t, time_step_duration)
