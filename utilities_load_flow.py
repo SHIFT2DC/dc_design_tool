@@ -864,32 +864,37 @@ def perform_dc_load_flow_with_droop(net: pp.pandapowerNet, use_case: dict, t, ti
     """
     # Iterative process
 
+    # Initialize
     error = 1
+    nb_it = 0
+    # Define tolerance
     tol = 1e-2
-    it = 0
     max_it = 200
+
+    # Perform initial load flow
     net = perform_dc_load_flow(net, use_case, node_data, PDU_droop_control=True)
+
     bus_voltages_previous = np.zeros(net.res_bus.vm_pu.values.shape)
     bus_voltages = np.zeros(net.res_bus.vm_pu.values.shape)
 
-    while (abs(error) > tol) and (it < 5):
+    while (abs(error) > tol) and (nb_it < 5):
 
         bus_voltages_previous = bus_voltages
-
         net, soc_list = droop_correction(net, t, time_step_duration)
-
         net = perform_dc_load_flow(net, use_case, node_data, PDU_droop_control=True)
-
         bus_voltages = net.res_bus.vm_pu.values
-        # Computes error
-        error = compute_error(bus_voltages, bus_voltages_previous,net)
-        print('it : ', it, ' error value : ', error)
-        it = it + 1
-        if it == max_it:
+
+        # Compute error
+        error = compute_error(bus_voltages, bus_voltages_previous, net)
+
+        print('nb_it : ', nb_it, ' error value : ', error)
+        nb_it = nb_it + 1
+        if nb_it == max_it:
             print('\nout by iteration\n error : ', error)
+
     c = 0
     for i, _ in net.storage.iterrows():
-        if ('Battery' in net.storage.loc[i,'name']):
+        if 'Battery' in net.storage.loc[i, 'name']:
             soc = soc_list[c]
             print(soc_list)
             print(soc)
@@ -899,14 +904,14 @@ def perform_dc_load_flow_with_droop(net: pp.pandapowerNet, use_case: dict, t, ti
     return net
 
 
-def compute_error(bus_voltages, bus_voltages_previous,net):
+def compute_error(bus_voltages, bus_voltages_previous, net):
     
     voltage_deviation = abs(bus_voltages - bus_voltages_previous) / bus_voltages
     max_deviation = max(voltage_deviation)
     # print(pd.DataFrame(data=np.vstack((bus_voltages,bus_voltages_previous,voltage_deviation*100)).T,index=net.res_bus.index,columns=['v_bus','prev_v_bus','dev']))
     # print('load  :' ,net.load['p_mw'])
     # print('sgen  :' ,net.sgen['p_mw'])
-    print('storage  :\n' ,net.storage['p_mw'])
+    print('storage  :\n', net.storage['p_mw'])
     return max_deviation * 100  # Error in percentage
 
 
@@ -927,7 +932,7 @@ def droop_correction(net,t,time_step_duration):
 
 
 def get_voltage_bus(i, attr, net):
-    asset_bus = getattr(net,attr).loc[i, 'bus']
+    asset_bus = getattr(net, attr).loc[i, 'bus']
     converter_connected = net.converter[(net.converter.from_bus == asset_bus) | (net.converter.to_bus == asset_bus)]
 
     if converter_connected.empty:

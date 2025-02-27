@@ -20,7 +20,7 @@ def create_dc_network(path: str, path_cable_catalogue: str, path_converter_catal
         tuple: A tuple containing:
             - net (pandapower.Network): The created pandapower network.
             - cable_catalogue (pd.DataFrame): The processed cable catalogue.
-            - Uc (dict): Dictionary containing UC definition data.
+            - use_case (dict): Dictionary containing UC definition data.
             - node_data
     """
     # Create an empty pandapower network
@@ -28,7 +28,7 @@ def create_dc_network(path: str, path_cable_catalogue: str, path_converter_catal
 
     # Read Excel file and UC definition
     xl_file = pd.ExcelFile(path)
-    Uc = read_uc_definition(xl_file)
+    use_case = read_uc_definition(xl_file)
 
     # Parse necessary sheets from the Excel file
     line_data = xl_file.parse('Lines')
@@ -39,17 +39,17 @@ def create_dc_network(path: str, path_cable_catalogue: str, path_converter_catal
     default_assets_profile = xl_file.parse('Default Assets Profiles')
     # Read and process the cable catalogue
     cable_catalogue = read_cable_catalogue(path_cable_catalogue)
-    cable_info = Uc['Conductor parameters']
+    cable_info = use_case['Conductor parameters']
     cable_catalogue = process_cable_catalogue(cable_catalogue, cable_info)
 
     # Read and filter the converter catalogue
     converter_catalogue = pd.ExcelFile(path_converter_catalogue).parse('Converters')
     converter_catalogue = converter_catalogue.loc[
-        converter_catalogue['Ecosystem'] == Uc['Project details']['Ecosystem']
+        converter_catalogue['Ecosystem'] == use_case['Project details']['Ecosystem']
     ]
 
     # Create buses and components
-    _create_buses_and_components(net, node_data, converter_default, user_profile_data, default_assets_profile, Uc)
+    _create_buses_and_components(net, node_data, converter_default, user_profile_data, default_assets_profile, use_case)
     
     # Create converters
     _create_converters(net, converter_data, converter_default, converter_catalogue)
@@ -65,7 +65,7 @@ def create_dc_network(path: str, path_cable_catalogue: str, path_converter_catal
     # Create converters
     _create_converters(net, converter_data, converter_default, converter_catalogue)
 
-    return net, cable_catalogue, Uc, node_data
+    return net, cable_catalogue, use_case, node_data
 
 
 def _create_buses_and_components(net: pp.pandapowerNet, node_data: pd.DataFrame, converter_default, user_profile_data, default_assets_profile, use_case) -> None:
