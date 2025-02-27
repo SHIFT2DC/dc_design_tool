@@ -161,7 +161,7 @@ def find_lines_between_given_line_and_ext_grid(net, line_id):
         list: List of indices of the lines between the given line and the external grid.
     """
     # Create a NetworkX graph from the pandapower network
-    G = pp.topology.create_nxgraph(net)
+    grid_graph = pp.topology.create_nxgraph(net)
 
     # Find the node connected to the external grid
     ext_grid_node = net.ext_grid.loc[net.ext_grid['in_service'] == True].bus.values[0]
@@ -172,8 +172,8 @@ def find_lines_between_given_line_and_ext_grid(net, line_id):
     to_node = line['to_bus']
 
     # Find all paths from the line nodes to the external grid node
-    paths_from = nx.shortest_path(G, source=from_node, target=ext_grid_node)
-    paths_to = nx.shortest_path(G, source=to_node, target=ext_grid_node)
+    paths_from = nx.shortest_path(grid_graph, source=from_node, target=ext_grid_node)
+    paths_to = nx.shortest_path(grid_graph, source=to_node, target=ext_grid_node)
 
     # Choose the shortest path
     if len(paths_from) > len(paths_to):
@@ -199,12 +199,12 @@ def get_bus_distances(net):
     Returns a dictionary {bus_id: distance}.
     """
     # Create graph representation of the grid
-    G = pp.topology.create_nxgraph(net)
+    grid_graph = pp.topology.create_nxgraph(net)
 
     # Identify the slack bus
     slack_bus = net.ext_grid.bus.values[0]
 
     # Compute distances
-    distances = nx.single_source_shortest_path_length(G, slack_bus)
+    distances = nx.single_source_shortest_path_length(grid_graph, slack_bus)
 
     return distances

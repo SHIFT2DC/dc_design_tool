@@ -216,9 +216,6 @@ def process_subnetwork(network_id: int, network_dict: Dict, loadflowed_subs: Lis
 
     # Adjust results if network contains 1 bus
     if len(tmp_net.bus) == 1:
-        #path = 'grid_data_input_file_building_demo.xlsx'
-        #xl_file = pd.ExcelFile(path)
-        #node_data = xl_file.parse('Assets Nodes')
         bus_idx = tmp_net.bus.index.values[0]
         matching_row = node_data.loc[node_data['Node number'] == bus_idx]
         matching_row['Component type'] = matching_row['Component type'].str.replace(' ', '').str.lower()
@@ -739,7 +736,7 @@ def check_high_voltage_nodes(net, voltage_threshold=1.1):
         UserWarning: When high voltage buses are found without generator connections
     """
 
-    # Identify overvoltage buses
+    # Identify over voltage buses
     high_voltage_buses = net.res_bus[net.res_bus.vm_pu > voltage_threshold].index
     
     for bus in high_voltage_buses:
@@ -879,7 +876,7 @@ def perform_dc_load_flow_with_droop(net: pp.pandapowerNet, use_case: dict, t, ti
 
         bus_voltages_previous = bus_voltages
 
-        net, SOC_list = droop_correction(net, t, time_step_duration)
+        net, soc_list = droop_correction(net, t, time_step_duration)
 
         net = perform_dc_load_flow(net, use_case, node_data, PDU_droop_control=True)
 
@@ -893,8 +890,8 @@ def perform_dc_load_flow_with_droop(net: pp.pandapowerNet, use_case: dict, t, ti
     c = 0
     for i, _ in net.storage.iterrows():
         if ('Battery' in net.storage.loc[i,'name']):
-            soc = SOC_list[c]
-            print(SOC_list)
+            soc = soc_list[c]
+            print(soc_list)
             print(soc)
             net.storage.loc[i, 'soc_percent'] = soc
             c += 1
@@ -914,19 +911,19 @@ def compute_error(bus_voltages, bus_voltages_previous,net):
 
 
 def droop_correction(net,t,time_step_duration):
-    SOC_list = []
+    soc_list = []
     attributes = ['load', 'sgen', 'storage']
     for attr in attributes:
         for i, _ in getattr(net, attr).iterrows():
             voltage_bus, v_asset = get_voltage_bus(i, attr, net)
             droop_curve = get_droop_curve(i, attr, net)
             if (attr == 'storage') and ('Battery' in getattr(net, attr).loc[i, 'name']):
-                p_droop, SOC = interpolate_bess_p_droop(i, attr, net, droop_curve, t, time_step_duration, v_asset)
-                SOC_list.append(SOC)
+                p_droop, soc = interpolate_bess_p_droop(i, attr, net, droop_curve, t, time_step_duration, v_asset)
+                soc_list.append(soc)
             else:
                 p_droop = interpolate_p_droop(i, attr, net, droop_curve, t, v_asset)
             getattr(net, attr).loc[i, 'p_mw'] = p_droop
-    return net, SOC_list
+    return net, soc_list
 
 
 def get_voltage_bus(i, attr, net):
@@ -990,20 +987,20 @@ def interpolate_bess_p_droop(i, attr, net, droop_curve, t, duration, v_asset):
     p_droop_curve = p_droop_curve*p_setpoint
     p_droop = np.interp(v_asset, v_droop_curve, p_droop_curve)
 
-    ini_SOC = getattr(net, attr).loc[i, 'soc_percent'].item()
-    max_ener = getattr(net, attr).loc[i, 'max_e_mwh'].item()
+    soc_init = getattr(net, attr).loc[i, 'soc_percent'].item()
+    max_energy = getattr(net, attr).loc[i, 'max_e_mwh'].item()
 
     # SOC computation
-    SOC_change = ((p_droop * duration) / max_ener) * 100  # SOC change (in %) Misses change 1 by period duration of each time step
-    SOC_f = SOC_change + ini_SOC  # if is_positive else ini_SOC - SOC_change
+    soc_change = ((p_droop * duration) / max_energy) * 100  # SOC change (in %) Misses change 1 by period duration of each time step
+    soc_final = soc_change + soc_init  # if is_positive else ini_SOC - SOC_change
 
-    if SOC_f <= 0: 
-        SOC_max_var = ini_SOC
-        p_droop = (SOC_max_var / (100 * duration)) * (max_ener) 
-        SOC_f = ini_SOC + SOC_max_var
-    elif SOC_f > 100: 
-        SOC_max_var = 100 - ini_SOC
-        p_droop = (SOC_max_var / (100 * duration)) * (max_ener) 
-        SOC_f = ini_SOC + SOC_max_var
+    if soc_final <= 0:
+        soc_max_var = soc_init
+        p_droop = (soc_max_var / (100 * duration)) * max_energy
+        soc_final = soc_init + soc_max_var
+    elif soc_final > 100:
+        soc_max_var = 100 - soc_init
+        p_droop = (soc_max_var / (100 * duration)) * max_energy
+        soc_final = soc_init + soc_max_var
 
-    return p_droop, SOC_f
+    return p_droop, soc_final

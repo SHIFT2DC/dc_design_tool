@@ -15,9 +15,6 @@ def plot_voltage(net):
     Parameters:
     net (pandapowerNet): The pandapower network object.
     """
-    # Print a message indicating the start of the plotting process
-    print(">Plot voltage profiles")
-
     bus_indices = net.bus.index
     bus_voltages = net.res_bus.vm_pu
 
@@ -48,17 +45,17 @@ def plot_network_evaluation_results_with_plotly(net, node_data, file_name):
     # Add equivalent transformers for visualization
     for _, row in net_plot.converter.iterrows():
         if row.type != 'ILC':
-            V1 = net_plot.bus.vn_kv.loc[net_plot.bus.index == row.from_bus].values[0]
-            V2 = net_plot.bus.vn_kv.loc[net_plot.bus.index == row.to_bus].values[0]
+            v1 = net_plot.bus.vn_kv.loc[net_plot.bus.index == row.from_bus].values[0]
+            v2 = net_plot.bus.vn_kv.loc[net_plot.bus.index == row.to_bus].values[0]
 
-            if V1 > V2:
+            if v1 > v2:
                 pp.create_transformer_from_parameters(
                     net_plot,
                     hv_bus=row.from_bus,
                     lv_bus=row.to_bus,
                     sn_mva=row.P,
-                    vn_hv_kv=V1,
-                    vn_lv_kv=V2,
+                    vn_hv_kv=v1,
+                    vn_lv_kv=v2,
                     vkr_percent=0,
                     vk_percent=0,
                     pfe_kw=0,
@@ -70,8 +67,8 @@ def plot_network_evaluation_results_with_plotly(net, node_data, file_name):
                     hv_bus=row.to_bus,
                     lv_bus=row.from_bus,
                     sn_mva=row.P,
-                    vn_hv_kv=V2,
-                    vn_lv_kv=V1,
+                    vn_hv_kv=v2,
+                    vn_lv_kv=v1,
                     vkr_percent=0,
                     vk_percent=0,
                     pfe_kw=0,
@@ -201,17 +198,17 @@ def plot_network_sizing_results_with_plotly(net, node_data, file_name):
     # Add equivalent transformers for visualization
     for _, row in net_plot.converter.iterrows():
         if row.type != 'ILC':
-            V1 = net_plot.bus.vn_kv.loc[net_plot.bus.index == row.from_bus].values[0]
-            V2 = net_plot.bus.vn_kv.loc[net_plot.bus.index == row.to_bus].values[0]
+            v1 = net_plot.bus.vn_kv.loc[net_plot.bus.index == row.from_bus].values[0]
+            v2 = net_plot.bus.vn_kv.loc[net_plot.bus.index == row.to_bus].values[0]
 
-            if V1 > V2:
+            if v1 > v2:
                 pp.create_transformer_from_parameters(
                     net_plot,
                     hv_bus=row.from_bus,
                     lv_bus=row.to_bus,
                     sn_mva=row.P,
-                    vn_hv_kv=V1,
-                    vn_lv_kv=V2,
+                    vn_hv_kv=v1,
+                    vn_lv_kv=v2,
                     vkr_percent=0,
                     vk_percent=0,
                     pfe_kw=0,
@@ -223,8 +220,8 @@ def plot_network_sizing_results_with_plotly(net, node_data, file_name):
                     hv_bus=row.to_bus,
                     lv_bus=row.from_bus,
                     sn_mva=row.P,
-                    vn_hv_kv=V2,
-                    vn_lv_kv=V1,
+                    vn_hv_kv=v2,
+                    vn_lv_kv=v1,
                     vkr_percent=0,
                     vk_percent=0,
                     pfe_kw=0,

@@ -3,34 +3,38 @@ import numpy as np
 import pandas as pd
 
 
-def read_UC_Definition(xl_file):
+def read_uc_definition(xl_file):
+    """
+    Read the 'UC Definition' sheet from the provided Excel file.
+
+    """
     df = xl_file.parse('UC Definition').rename(columns={"Project details": "param", "Unnamed: 1": "val"})
-    UC_Definition = {}
+    uc_definition = {}
 
     i_start = 0
-    UC_Definition['Project details'] = {df.iloc[i_start+i].param: df.iloc[i_start+i].val for i in range(4)}
+    uc_definition['Project details'] = {df.iloc[i_start+i].param: df.iloc[i_start+i].val for i in range(4)}
     
     i_start = list(df.loc[df['param'] == 'Grid architecture and inputs'].index)[0]+1
-    UC_Definition['Grid architecture and inputs'] = {df.iloc[i_start+i].param: df.iloc[i_start+i].val for i in range(10)}
+    uc_definition['Grid architecture and inputs'] = {df.iloc[i_start+i].param: df.iloc[i_start+i].val for i in range(10)}
     
     i_start = list(df.loc[df['param'] == 'Conductor parameters'].index)[0]+1
-    UC_Definition['Conductor parameters'] = {df.iloc[i_start+i].param: df.iloc[i_start+i].val for i in range(3)}
+    uc_definition['Conductor parameters'] = {df.iloc[i_start+i].param: df.iloc[i_start+i].val for i in range(3)}
     
     i_start = list(df.loc[df['param'] == 'Sizing factors'].index)[0]+1
-    UC_Definition['Sizing factor'] = {df.iloc[i_start+i].param: df.iloc[i_start+i].val for i in range(4)}
+    uc_definition['Sizing factor'] = {df.iloc[i_start+i].param: df.iloc[i_start+i].val for i in range(4)}
     
     i_start = list(df.loc[df['param'] == 'Worst case scenario 1 for sizing of Storage DC/DC converter '].index)[0]+1
-    UC_Definition['Worst case scenario 1 for sizing of Storage DC/DC converter '] = {df.iloc[i_start+i].param: df.iloc[i_start+i].val for i in range(5)}
+    uc_definition['Worst case scenario 1 for sizing of Storage DC/DC converter '] = {df.iloc[i_start+i].param: df.iloc[i_start+i].val for i in range(5)}
     
     i_start = list(df.loc[df['param'] == 'Worst case scenario 2 for sizing of cables and  PDU DC/DC,  DC/AC, PV DC/DC and EV DC/DC converters '].index)[0]+1
-    UC_Definition['Worst case scenario 2 for sizing of cables and  PDU DC/DC,  DC/AC, PV DC/DC and EV DC/DC converters '] =  {df.iloc[i_start+i].param: df.iloc[i_start+i].val for i in range(5)}
+    uc_definition['Worst case scenario 2 for sizing of cables and  PDU DC/DC,  DC/AC, PV DC/DC and EV DC/DC converters '] =  {df.iloc[i_start+i].param: df.iloc[i_start+i].val for i in range(5)}
     
     i_start = list(df.loc[df['param'] == 'Worst case scenario 3 for sizing cables and AC/DC converter'].index)[0]+1
-    UC_Definition['Worst case scenario 3 for sizing cables and AC/DC converter'] = {df.iloc[i_start+i].param: df.iloc[i_start+i].val for i in range(5)}
+    uc_definition['Worst case scenario 3 for sizing cables and AC/DC converter'] = {df.iloc[i_start+i].param: df.iloc[i_start+i].val for i in range(5)}
     
     i_start = list(df.loc[df['param'] == 'Parameters for annual simulations'].index)[0]+1
-    UC_Definition['Parameters for annual simulations'] = {df.iloc[i_start+i].param: df.iloc[i_start+i].val for i in range(2)}
-    return UC_Definition
+    uc_definition['Parameters for annual simulations'] = {df.iloc[i_start+i].param: df.iloc[i_start+i].val for i in range(2)}
+    return uc_definition
 
 
 def read_cable_catalogue(path_catalogue):
@@ -63,7 +67,7 @@ def process_cable_catalogue(catalogue, cable_info):
     """
     print(cable_info)
     # Extract temperature, material, and isolation type from cable_info
-    T = cable_info['Operating temperature (degrees Celsius)']
+    op_temp = cable_info['Operating temperature (degrees Celsius)']
     mat = cable_info['Material ']
     isolation = cable_info['Isolation ']
     if 'Cu' in mat:
@@ -81,10 +85,10 @@ def process_cable_catalogue(catalogue, cable_info):
     catalogue = catalogue.loc[catalogue['isolation'].str.lower() == isolation.lower()]
 
     # Calculate the resistance (R) at the given temperature
-    catalogue['R'] = catalogue['Coef'] * (1 + catalogue['Const_r'] * (T - 20))
+    catalogue['R'] = catalogue['Coef'] * (1 + catalogue['Const_r'] * (op_temp - 20))
 
     # Calculate the maximum current (Imax) based on the temperature and resistance
-    catalogue['Imax'] = np.sqrt((catalogue['Tcond'] - T) / (catalogue['Const_isol'] * catalogue['R']))
+    catalogue['Imax'] = np.sqrt((catalogue['Tcond'] - op_temp) / (catalogue['Const_isol'] * catalogue['R']))
 
     # Sort the catalogue by maximum current (Imax)
     catalogue = catalogue.sort_values(by=['Imax'])
