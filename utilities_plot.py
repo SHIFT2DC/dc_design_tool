@@ -332,6 +332,31 @@ def plot_network_sizing_results_with_plotly(net, node_data, file_name):
     fig.show()
 
 
+def plot_bus_voltage_heatmap(net, scenario_name):
+    bus_indices = list(map(str, net.bus.index))  # Convert to strings for categorical x-axis
+
+    fig = px.bar(
+        x=bus_indices,
+        y=net.res_bus.vm_pu,
+        color=net.res_bus.vm_pu,
+        labels={'x': 'Bus Index', 'y': 'Voltage (p.u.)'},
+        title=rf'Bus Voltage Levels in scenario {scenario_name.split(" ")[3]}',
+    )
+
+    # Force all x-ticks to be displayed
+    fig.update_layout(
+        xaxis=dict(
+            tickmode='array',
+            tickvals=list(range(len(bus_indices))),
+            ticktext=bus_indices,
+            showticklabels=True
+        ),
+        bargap=0.1
+    )
+    fig.show()
+    fig.write_html(rf'output_voltage_bars_scenario_{scenario_name.split(" ")[3]}.html')
+
+
 def save_sizing_results_to_excel(net, node_data, file_name):
     # Create the "line sizing" sheet
     line_sizing_data = {
@@ -360,26 +385,131 @@ def save_sizing_results_to_excel(net, node_data, file_name):
     print(f"Sizing results saved to {file_name}")
 
 
-def plot_bus_voltage_heatmap(net, scenario_name):
-    bus_indices = list(map(str, net.bus.index))  # Convert to strings for categorical x-axis
+def plot_efficiency_kpi(efficiency_results):
+    labels = ['Efficiency Ratio', 'Total Consumed Energy (MWh)', 'Total Generated Energy (MWh)',
+              'Total Losses in Cables (MWh)', 'Total Losses in Converters (MWh)']
+    values = [efficiency_results[0], efficiency_results[1], efficiency_results[2],
+              efficiency_results[3], efficiency_results[4]]
 
-    fig = px.bar(
-        x=bus_indices,
-        y=net.res_bus.vm_pu,
-        color=net.res_bus.vm_pu,
-        labels={'x': 'Bus Index', 'y': 'Voltage (p.u.)'},
-        title=rf'Bus Voltage Levels in scenario {scenario_name.split(" ")[3]}',
-    )
+    fig, ax1 = plt.subplots(figsize=(8, 6))
 
-    # Force all x-ticks to be displayed
-    fig.update_layout(
-        xaxis=dict(
-            tickmode='array',
-            tickvals=list(range(len(bus_indices))),
-            ticktext=bus_indices,
-            showticklabels=True
-        ),
-        bargap=0.1
-    )
-    fig.show()
-    fig.write_html(rf'output_voltage_bars_scenario_{scenario_name.split(" ")[3]}.html')
+    # Plot the quantities on the primary y-axis
+    ax1.bar(labels[1:], values[1:], color=['green', 'orange', 'red', 'purple'])
+    # ax1.set_xlabel('KPI Type')
+    ax1.set_ylabel('Energy (MWh)', color='black')
+    ax1.tick_params(axis='y', labelcolor='black')
+
+    # Rotate the xticks to 45 degrees
+    plt.xticks(rotation=45, ha='right')
+
+    # Create a secondary y-axis for the Efficiency Ratio
+    ax2 = ax1.twinx()
+    ax2.bar(labels[:1], [values[0]], color='blue', alpha=0.6)  # Bar for Efficiency Ratio
+    ax2.set_ylabel('Efficiency Ratio', color='blue')
+    ax2.tick_params(axis='y', labelcolor='blue')
+
+    # Adding title and adjusting layout
+    plt.title('Efficiency KPI')
+    plt.tight_layout()
+
+    # Save or show the plot
+    plt.savefig('output_kpis_results_efficiency.png')
+    plt.close()
+
+
+def plot_economic_kpi(economic_results):
+    # Extract CAPEX details
+    total_capex_keur = economic_results[0]
+    capex_details = economic_results[1]
+    converters_capex = capex_details['Converters CAPEX (kEUR)']
+    cables_capex = capex_details['Cables CAPEX (kEUR)']
+
+    # Data for pie chart
+    labels = ['Converters CAPEX', 'Cables CAPEX']
+    sizes = [converters_capex, cables_capex]
+    colors = ['lightblue', 'lightgreen']
+
+    # Create a pie chart
+    fig, ax = plt.subplots(figsize=(6, 6))
+    ax.pie(sizes, labels=labels, autopct='%1.1f%%', startangle=90, colors=colors, wedgeprops={'edgecolor': 'black'})
+    ax.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
+
+    # Add title
+    plt.title(f"CAPEX Distribution (Total CAPEX: {total_capex_keur} kEUR)")
+
+    # Show or save the plot
+    plt.savefig('output_kpis_results_economic.png')
+    plt.close()
+
+
+def plot_environmental_kpi(environmental_results):
+    labels = ['Total Weight (kg)', 'Total Lifecycle Emissions (kg CO2)']
+    values = [environmental_results[0], environmental_results[2]]
+
+    plt.figure(figsize=(8, 6))
+    plt.bar(labels, values, color=['brown', 'green'])
+    plt.title('Environmental KPI')
+    plt.xlabel('KPI Type')
+    plt.ylabel('Value')
+    plt.tight_layout()
+    plt.savefig('output_kpis_results_environmental.png')
+    plt.close()
+
+
+def save_kpis_results_to_excel(file_path, efficiency_results, economic_results, environmental_results):
+    # Plot each KPI type
+    plot_efficiency_kpi(efficiency_results)
+    plot_economic_kpi(economic_results)
+    plot_environmental_kpi(environmental_results)
+
+    # Efficiency KPI results
+    efficiency_df = pd.DataFrame({
+        'Efficiency Ratio': [efficiency_results[0]],
+        'Total Consumed Energy (MWh)': [efficiency_results[1]],
+        'Total Generated Energy (MWh)': [efficiency_results[2]],
+        'Total Losses in Cables (MWh)': [efficiency_results[3]],
+        'Total Losses in Converters (MWh)': [efficiency_results[4]]
+    })
+
+    # Economic KPI results - split Capex Details into separate columns
+    capex_details = economic_results[1]
+    economic_df = pd.DataFrame({
+        'Total CAPEX (KEUR)': [economic_results[0]],
+        'Converters CAPEX (KEUR)': [capex_details['Converters CAPEX (kEUR)']],
+        'Cables CAPEX (KEUR)': [capex_details['Cables CAPEX (kEUR)']]
+    })
+
+    # Add individual converter details (each converter in a separate column)
+    for converter, cost in capex_details['Details']['Converters'].items():
+        economic_df[f'Converter {converter} CAPEX (KEUR)'] = [cost]
+
+    # Add individual cable line details (each cable line in a separate column)
+    for cable_line, cost in capex_details['Details']['Cables'].items():
+        economic_df[f'Cable {cable_line} CAPEX (KEUR)'] = [cost]
+
+    # Environmental KPI results - split Weight Details into separate columns
+    weight_details = environmental_results[1]
+    environmental_df = pd.DataFrame({
+        'Total Weight (kg)': [environmental_results[0]],
+        'Total Lifecycle Emissions (kg CO2)': [environmental_results[2]]
+    })
+
+    # Add individual converter details (each converter in a separate column)
+    for converter, weight in weight_details['Details']['Converters'].items():
+        environmental_df[f'Converter {converter} Weight (kg)'] = [weight]
+
+    # Add individual cable line details (each converter in a separate column)
+    for cable_line, weight in weight_details['Details']['Cables'].items():
+        environmental_df[f'Cable {cable_line} Weight (kg)'] = [weight]
+
+    # Create an Excel writer
+    with pd.ExcelWriter(file_path, engine='openpyxl') as writer:
+        # Save each dataframe to a different sheet
+        efficiency_df.to_excel(writer, sheet_name='Efficiency', index=False)
+        economic_df.to_excel(writer, sheet_name='Economic', index=False)
+        environmental_df.to_excel(writer, sheet_name='Environmental', index=False)
+
+    print(f"KPIs have been saved to {file_path}")
+
+
+

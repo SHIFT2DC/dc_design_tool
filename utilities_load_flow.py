@@ -766,6 +766,18 @@ def check_high_voltage_nodes(net, voltage_threshold=1.1):
 
 
 def update_network(net, t):
+    """
+    Updates the power values of loads, generators (sgen), and storage units in the pandapower network
+    based on their predefined power profiles at a given time step t.
+
+    Parameters:
+    net (pandapowerNet): The pandapower network object containing load, sgen, and storage elements.
+    t (int): The current time step index.
+
+    The function adjusts the power values (p_mw) based on the predefined power profile (`power_profile`).
+    If t exceeds the profile length, a warning is displayed, and the last available value is used.
+    """
+
     for i, _ in net.load.iterrows():
         if not np.isnan(net.load.loc[i, 'power_profile']).any():
             if t < len(net.load.loc[i, 'power_profile']):
@@ -836,23 +848,43 @@ def fill_result_dataframe(df, t, net):
 
 
 def perform_timestep_dc_load_flow(net, use_case, node_data):
+    """
+    Performs a time-step DC load flow simulation for the given network over a defined period.
 
+    Parameters:
+    net (pandapowerNet): The pandapower network object.
+    use_case (dict): A dictionary containing simulation parameters such as timestep and duration.
+    node_data (DataFrame): Data related to network nodes, possibly containing component details.
+
+    Returns:
+    net_snapshots (list): A list of network snapshots at each time step.
+    results (DataFrame): A DataFrame containing simulation results for each time step.
+    """
+    # Retrieve simulation parameters from the use_case dictionary
     timestep = use_case['Parameters for annual simulations']['Simulation time step (mins)']
     timelaps = use_case['Parameters for annual simulations']['Simulation period (days)']
+
+    # Compute the total number of simulation steps based on time step and duration
     number_of_timestep = int(timelaps*24*60/timestep)
 
+    # Initialize an empty DataFrame to store results with time step index
     results = pd.DataFrame(index=range(number_of_timestep))
-    net_snapshots = []  # Store network state at each time step
+    # Initialize a list to store network snapshots at each time step
+    net_snapshots = []
 
+    # Loop through each time step in the simulation
     for t in tqdm(range(number_of_timestep)):
-        # Update network at time step t
+        # Update network with time step t data
         update_network(net, t)
-        # Perform Load flow
+
+        # Perform Load flow analysis with PDU droop control
         net = perform_dc_load_flow(net, use_case, node_data, PDU_droop_control=True)
+        # Perform load flow considering droop control behavior at time t
         net = perform_dc_load_flow_with_droop(net, use_case, t, timestep/60, node_data)
+
         # Store network snapshot
         net_snapshots.append(net.deepcopy())
-        # Fill results
+        # Store the simulation results for the current time step
         results = fill_result_dataframe(results, t, net)
     
     return net_snapshots, results
@@ -860,130 +892,258 @@ def perform_timestep_dc_load_flow(net, use_case, node_data):
  
 def perform_dc_load_flow_with_droop(net: pp.pandapowerNet, use_case: dict, t, time_step_duration, node_data) -> pp.pandapowerNet:
     """
-    Performs DC load flow calculation on the network.
+    Performs DC load flow calculation on the network with iterative droop control adjustments.
 
     Args:
-        net (pp.pandapowerNet): The network to analyze.
+        net (pp.pandapowerNet): The DC network model in pandapower.
+        use_case (dict): Dictionary containing simulation parameters.
+        t (int): Current time step.
+        time_step_duration (float): Duration of the time step in hours.
+        node_data: Additional data related to network nodes.
 
     Returns:
-        pp.pandapowerNet: The network with load flow results.
+        pp.pandapowerNet: The updated network with load flow results after droop correction.
     """
-    # Iterative process
+    # Initialize iterative process variables
+    error = 1  # Initial error value
+    nb_it = 0  # Iteration counter
+    tol = 1e-2  # Tolerance for convergence
+    max_it = 3  # Maximum number of iterations
 
-    # Initialize
-    error = 1
-    nb_it = 0
-    # Define tolerance
-    tol = 1e-2
-    max_it = 3
-
-    # Perform initial load flow
+    # Perform initial DC load flow with droop control enabled
     net = perform_dc_load_flow(net, use_case, node_data, PDU_droop_control=True)
 
+    # Initialize bus voltage arrays for tracking convergence
     bus_voltages_previous = np.zeros(net.res_bus.vm_pu.values.shape)
     bus_voltages = np.zeros(net.res_bus.vm_pu.values.shape)
 
+    # Iteratively adjust droop control settings until convergence or max iterations reached
     while (abs(error) > tol) and (nb_it < max_it):
 
+        # Store previous iteration's bus voltages
         bus_voltages_previous = bus_voltages
+
+        # Apply droop correction based on the current time step
         net, soc_list = droop_correction(net, t, time_step_duration)
+
+        # Perform DC load flow again with updated parameters
         net = perform_dc_load_flow(net, use_case, node_data, PDU_droop_control=True)
+
+        # Retrieve updated bus voltages
         bus_voltages = net.res_bus.vm_pu.values
 
-        # Compute error
+        # Compute error to check convergence
         error = compute_error(bus_voltages, bus_voltages_previous, net)
 
+        # Display iteration status
         print('nb_it : ', nb_it, ' error value : ', error)
+        # Increment iteration counter
         nb_it = nb_it + 1
+
+        # If maximum iterations reached, print warning
         if nb_it == max_it:
             print('\nout by iteration\n error : ', error)
 
+    # Update state of charge (SOC) for batteries in storage elements
     c = 0
     for i, _ in net.storage.iterrows():
-        if 'Battery' in net.storage.loc[i, 'name']:
-            soc = soc_list[c]
-            print(soc_list)
-            print(soc)
-            net.storage.loc[i, 'soc_percent'] = soc
-            c += 1
+        if 'Battery' in net.storage.loc[i, 'name']:  # Check if the storage unit is a battery
+            soc = soc_list[c]  # Retrieve the corresponding SOC value
+            print(soc_list)  # Debugging: Print SOC list
+            print(soc)  # Debugging: Print individual SOC value
+            net.storage.loc[i, 'soc_percent'] = soc  # Update SOC in the network model
+            c += 1  # Move to the next SOC value in the list
         
     return net
 
 
 def compute_error(bus_voltages, bus_voltages_previous, net):
-    
+    """
+    Computes the voltage deviation error between two consecutive iterations in the droop control adjustment process.
+
+    Args:
+        bus_voltages (numpy.ndarray): Current iteration's bus voltages in pu.
+        bus_voltages_previous (numpy.ndarray): Previous iteration's bus voltages in pu.
+        net (pp.pandapowerNet): The network model used for calculations.
+
+    Returns:
+        float: Maximum voltage deviation as a percentage.
+    """
+    # Compute the absolute relative deviation of voltages
     voltage_deviation = abs(bus_voltages - bus_voltages_previous) / bus_voltages
+    # Find the maximum deviation across all buses
     max_deviation = max(voltage_deviation)
+
+    # Debugging output (commented out but useful for analysis)
     # print(pd.DataFrame(data=np.vstack((bus_voltages,bus_voltages_previous,voltage_deviation*100)).T,index=net.res_bus.index,columns=['v_bus','prev_v_bus','dev']))
     # print('load  :' ,net.load['p_mw'])
     # print('sgen  :' ,net.sgen['p_mw'])
     print('storage  :\n', net.storage['p_mw'])
+
     return max_deviation * 100  # Error in percentage
 
 
-def droop_correction(net,t,time_step_duration):
-    soc_list = []
-    attributes = ['load', 'sgen', 'storage']
+def droop_correction(net, t, time_step_duration):
+    """
+    Adjusts the power setpoints of network elements (loads, generators, and storage)
+    based on their droop control curves.
+
+    Args:
+        net (pp.pandapowerNet): The network model being analyzed.
+        t (int): Current time step index.
+        time_step_duration (float): Duration of each time step in hours.
+
+    Returns:
+        tuple:
+            - net (pp.pandapowerNet): Updated network with new power setpoints.
+            - soc_list (list): List of updated state-of-charge (SOC) values for batteries.
+    """
+    soc_list = []  # Store SOC values for batteries
+    attributes = ['load', 'sgen', 'storage']   # Network elements subject to droop correction
     for attr in attributes:
+        # Iterate over each element (row) in the corresponding dataframe (load, sgen, storage)
         for i, _ in getattr(net, attr).iterrows():
+            # Get voltage of the bus where the element is connected
             voltage_bus, v_asset = get_voltage_bus(i, attr, net)
+
+            # Retrieve the droop curve for the element
             droop_curve = get_droop_curve(i, attr, net)
+
+            # Special case for batteries in storage elements
             if (attr == 'storage') and ('Battery' in getattr(net, attr).loc[i, 'name']):
+                # Compute power adjustment and SOC based on droop characteristics
                 p_droop, soc = interpolate_bess_p_droop(i, attr, net, droop_curve, t, time_step_duration, v_asset)
                 soc_list.append(soc)
             else:
+                # Compute power adjustment based on droop characteristics
                 p_droop = interpolate_p_droop(i, attr, net, droop_curve, t, v_asset)
+
+            # Update the power setpoint of the element
             getattr(net, attr).loc[i, 'p_mw'] = p_droop
+
     return net, soc_list
 
 
 def get_voltage_bus(i, attr, net):
+    """
+    Retrieves the voltage of the bus to which a given network element (load, generator, or storage) is connected.
+
+    If the element is directly connected to a bus, the voltage of that bus is returned.
+    If the element is connected through a converter, the voltage of the opposite-side bus of the converter is returned.
+
+    Args:
+        i (int): Index of the network element.
+        attr (str): Type of network element ('load', 'sgen', or 'storage').
+        net (pp.pandapowerNet): The pandapower network model.
+
+    Returns:
+        tuple:
+            - voltage_bus (int): The index of the bus where voltage should be retrieved.
+            - v_asset (float): The per-unit voltage value of the bus.
+    """
+    # Retrieve the bus where the asset (load, generator, or storage) is connected
     asset_bus = getattr(net, attr).loc[i, 'bus']
+    # Check if a converter is connected to this bus
     converter_connected = net.converter[(net.converter.from_bus == asset_bus) | (net.converter.to_bus == asset_bus)]
 
     if converter_connected.empty:
+        # If no converter is connected, use the asset's direct bus
         voltage_bus = asset_bus
     else:
+        # If a converter is connected, retrieve its index
         converter_id = converter_connected.index[0]
+        # Identify the bus on the opposite side of the converter
         if net.converter.loc[converter_id, 'from_bus'] == asset_bus:
             voltage_bus = net.converter.loc[converter_id, 'to_bus']
         else:
             voltage_bus = net.converter.loc[converter_id, 'from_bus']
 
+    # Retrieve the voltage (per unit) at the determined bus
     v_asset = net.res_bus.loc[voltage_bus, 'vm_pu'].item()
+
     return voltage_bus, v_asset
 
 
 def get_droop_curve(i, attr, net):
+    """
+    Retrieves the droop curve for a given network element (load, generator, or storage).
+
+    If the element is directly connected to a bus, the function checks whether the droop curve is defined for it.
+    If the droop curve is missing, a default curve is assigned.
+    If the element is connected through a converter, the function retrieves the droop curve from the converter.
+
+    Args:
+        i (int): Index of the network element.
+        attr (str): Type of network element ('load', 'sgen', or 'storage').
+        net (pp.pandapowerNet): The pandapower network model.
+
+    Returns:
+        np.ndarray: The droop curve of the element, either from the element itself or the associated converter.
+    """
+    # Retrieve the bus where the asset (load, generator, or storage) is connected
     asset_bus = getattr(net, attr).loc[i, 'bus']
+    # Check if a converter is connected to this bus
     converter_connected = net.converter[(net.converter.from_bus == asset_bus) | (net.converter.to_bus == asset_bus)]
 
     if converter_connected.empty:
+        # If no converter is connected, check if the element has a defined droop curve
         if np.isnan(net.load.loc[i, 'droop_curve']).any():
+            # Assign a default droop curve if none is provided
             droop_curve = np.array([[1.5,1], [1.1,1], [1,1], [1,1], [0.99,1], [0.95,1]])
         else:
+            # Use the droop curve defined in the load element
             droop_curve = net.load.loc[i, 'droop_curve']
     else:
+        # If a converter is connected, retrieve its index
         converter_id = converter_connected.index[0]
+        # Check if the converter has a defined droop curve
         if net.converter.loc[converter_id, 'droop_curve'] is None:
+            # Assign a default droop curve if the converter has none
             droop_curve = np.array([[1.5,1], [1.1,1], [1,1], [1,1], [0.99,1], [0.95,1]])
         else:
+            # Use the droop curve defined in the converter
             droop_curve = net.converter.loc[converter_id, 'droop_curve']
+
     return droop_curve
 
 
 def interpolate_p_droop(i, attr, net, droop_curve, t, v_asset):
-    p_droop_curve = droop_curve[:, 1]
-    v_droop_curve = droop_curve[:, 0]
+    """
+    Interpolates the droop power setpoint based on the voltage at the asset's bus.
+
+    This function uses the droop curve to determine the power adjustment for a given voltage level.
+    The droop curve consists of voltage (x-axis) and corresponding power setpoints (y-axis).
+
+    Args:
+        i (int): Index of the network element.
+        attr (str): Type of network element ('load', 'sgen', or 'storage').
+        net (pp.pandapowerNet): The pandapower network model.
+        droop_curve (np.ndarray): 2D array where the first column is voltage and the second is power factor.
+        t (int): Current time step.
+        v_asset (float): The voltage at the asset's bus.
+
+    Returns:
+        float: The interpolated power setpoint based on the droop curve.
+    """
+    # Extract power and voltage points from the droop curve
+    p_droop_curve = droop_curve[:, 1]  # Power scaling factors
+    v_droop_curve = droop_curve[:, 0]  # Corresponding voltage levels
+
+    # Ensure the droop curve is sorted in ascending order of voltage
     v_droop_curve, p_droop_curve = zip(*sorted(zip(v_droop_curve, p_droop_curve)))
+    # Convert tuples back to NumPy arrays
     v_droop_curve = np.array(v_droop_curve)
     p_droop_curve = np.array(p_droop_curve)
 
+    # Compute the base power setpoint at this time step
     p_setpoint = getattr(net, attr).loc[i, 'power_profile'][t]*getattr(net, attr).loc[i, 'p_nom_mw']
-    
+
+    # Scale the droop power curve using the base setpoint
     p_droop_curve = p_droop_curve*p_setpoint
 
+    # Interpolate the power setpoint for the given asset voltage
     p_droop = np.interp(v_asset, v_droop_curve, p_droop_curve)
+
     return p_droop
 
 
