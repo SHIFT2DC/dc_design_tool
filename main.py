@@ -51,3 +51,4 @@ save_kpis_results_to_excel(
     (total_capex_keur, capex_details),
     (total_weight_kg, weight_details, total_lifecycle_emissions_kg_co2)
 )
+
