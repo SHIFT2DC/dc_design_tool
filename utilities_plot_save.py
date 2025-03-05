@@ -6,6 +6,12 @@ import pandapower as pp
 import copy
 import plotly.graph_objects as go
 import plotly.express as px
+import os
+
+# Define the output directory
+output_dir = "output"
+# Create the directory if it doesn't exist
+os.makedirs(output_dir, exist_ok=True)
 
 
 def plot_voltage(net):
@@ -325,7 +331,7 @@ def plot_network_sizing_results_with_plotly(net, node_data, file_name):
         figsize=2,
         aspectratio=(20, 10),
         filename=file_name,
-        auto_open=True,
+        auto_open=False,
         showlegend=True
     )
 
@@ -354,7 +360,7 @@ def plot_bus_voltage_heatmap(net, scenario_name):
         bargap=0.1
     )
     fig.show()
-    fig.write_html(rf'output_voltage_bars_scenario_{scenario_name.split(" ")[3]}.html')
+    fig.write_html(os.path.join(output_dir, rf'output_voltage_bars_scenario_{scenario_name.split(" ")[3]}.html'))
 
 
 def save_sizing_results_to_excel(net, node_data, file_name):
@@ -413,7 +419,7 @@ def plot_efficiency_kpi(efficiency_results):
     plt.tight_layout()
 
     # Save or show the plot
-    plt.savefig('output_kpis_results_efficiency.png')
+    plt.savefig(os.path.join(output_dir, 'output_kpis_results_efficiency.png'))
     plt.close()
 
 
@@ -438,7 +444,7 @@ def plot_economic_kpi(economic_results):
     plt.title(f"CAPEX Distribution (Total CAPEX: {total_capex_keur} kEUR)")
 
     # Show or save the plot
-    plt.savefig('output_kpis_results_economic.png')
+    plt.savefig(os.path.join(output_dir, 'output_kpis_results_economic.png'))
     plt.close()
 
 
@@ -452,7 +458,7 @@ def plot_environmental_kpi(environmental_results):
     plt.xlabel('KPI Type')
     plt.ylabel('Value')
     plt.tight_layout()
-    plt.savefig('output_kpis_results_environmental.png')
+    plt.savefig(os.path.join(output_dir, 'output_kpis_results_environmental.png'))
     plt.close()
 
 
@@ -462,19 +468,45 @@ def save_kpis_results_to_excel(file_path, efficiency_results, economic_results, 
     plot_economic_kpi(economic_results)
     plot_environmental_kpi(environmental_results)
 
+    # Helper function to replace None with "Not Available"
+    def safe_value(value):
+        return value if value is not None else "Not Available"
+
+    # Determine the correct label for energy savings
+    energy_savings_mwh = efficiency_results[5]
+    if energy_savings_mwh is not None:
+        energy_savings_label_mwh = 'Energy Savings (DC more efficient) (MWh)' if energy_savings_mwh >= 0 else 'Extra Energy (AC more efficient) (MWh)'
+        energy_savings_label_percent = 'Energy Savings (DC more efficient) (%)' if energy_savings_mwh >= 0 else 'Extra Energy (AC more efficient) (%)'
+    else:
+        energy_savings_label_mwh = 'Energy Savings / Extra Energy (MWh)'
+        energy_savings_label_percent = 'Energy Savings / Extra Energy (%)'
+
     # Efficiency KPI results
     efficiency_df = pd.DataFrame({
         'Efficiency Ratio': [efficiency_results[0]],
         'Total Consumed Energy (MWh)': [efficiency_results[1]],
         'Total Generated Energy (MWh)': [efficiency_results[2]],
         'Total Losses in Cables (MWh)': [efficiency_results[3]],
-        'Total Losses in Converters (MWh)': [efficiency_results[4]]
+        'Total Losses in Converters (MWh)': [efficiency_results[4]],
+        energy_savings_label_mwh: [safe_value(efficiency_results[5])],
+        energy_savings_label_percent: [safe_value(efficiency_results[6])]
     })
+
+    # Determine the correct label for CAPEX difference
+    capex_difference_keur = economic_results[2]
+    if capex_difference_keur is not None:
+        capex_difference_label_keur = 'CAPEX Savings (AC more expensive) (KEUR)' if capex_difference_keur >= 0 else 'Extra CAPEX (DC more expensive) (KEUR)'
+        capex_difference_label_percent = 'CAPEX Savings (AC more expensive) (%)' if capex_difference_keur >= 0 else 'Extra CAPEX (DC more expensive) (%)'
+    else:
+        capex_difference_label_keur = 'CAPEX Savings / Extra CAPEX (KEUR)'
+        capex_difference_label_percent = 'CAPEX Savings / Extra CAPEX (%)'
 
     # Economic KPI results - split Capex Details into separate columns
     capex_details = economic_results[1]
     economic_df = pd.DataFrame({
         'Total CAPEX (KEUR)': [economic_results[0]],
+        capex_difference_label_keur: [safe_value(economic_results[2])],
+        capex_difference_label_percent: [safe_value(economic_results[3])],
         'Converters CAPEX (KEUR)': [capex_details['Converters CAPEX (kEUR)']],
         'Cables CAPEX (KEUR)': [capex_details['Cables CAPEX (kEUR)']]
     })

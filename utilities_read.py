@@ -27,13 +27,16 @@ def read_uc_definition(xl_file):
     uc_definition['Worst case scenario 1 for sizing of Storage DC/DC converter '] = {df.iloc[i_start+i].param: df.iloc[i_start+i].val for i in range(5)}
     
     i_start = list(df.loc[df['param'] == 'Worst case scenario 2 for sizing of cables and  PDU DC/DC,  DC/AC, PV DC/DC and EV DC/DC converters '].index)[0]+1
-    uc_definition['Worst case scenario 2 for sizing of cables and  PDU DC/DC,  DC/AC, PV DC/DC and EV DC/DC converters '] =  {df.iloc[i_start+i].param: df.iloc[i_start+i].val for i in range(5)}
+    uc_definition['Worst case scenario 2 for sizing of cables and  PDU DC/DC,  DC/AC, PV DC/DC and EV DC/DC converters '] = {df.iloc[i_start+i].param: df.iloc[i_start+i].val for i in range(5)}
     
     i_start = list(df.loc[df['param'] == 'Worst case scenario 3 for sizing cables and AC/DC converter'].index)[0]+1
     uc_definition['Worst case scenario 3 for sizing cables and AC/DC converter'] = {df.iloc[i_start+i].param: df.iloc[i_start+i].val for i in range(5)}
     
     i_start = list(df.loc[df['param'] == 'Parameters for annual simulations'].index)[0]+1
     uc_definition['Parameters for annual simulations'] = {df.iloc[i_start+i].param: df.iloc[i_start+i].val for i in range(2)}
+
+    i_start = list(df.loc[df['param'] == 'Parameters of equivalent AC grid for KPIs comparison'].index)[0]+1
+    uc_definition['Parameters of equivalent AC grid for KPIs comparison'] = {df.iloc[i_start + i].param: df.iloc[i_start + i].val for i in range(3)}
     return uc_definition
 
 

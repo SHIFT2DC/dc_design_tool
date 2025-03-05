@@ -347,3 +347,42 @@ def calculate_lifecycle_emissions_kpi(
 
     return total_lifecycle_emissions_kg_co2
 
+
+def calculate_energy_savings(dc_total_energy_mwh, ac_total_energy_mwh):
+    """
+    Calculate the energy savings or extra energy when using a DC grid.
+    Args:
+        dc_total_energy_mwh: Total energy produced in the DC grid (MWh).
+        ac_total_energy_mwh: Total energy produced in the equivalent AC grid (MWh).
+
+    Returns:
+        tuple: (absolute energy savings in MWh - positive if DC is more efficient, negative if AC is more efficient,
+        percentage savings relative to AC energy)
+
+    """
+    if ac_total_energy_mwh is None or pd.isna(ac_total_energy_mwh):  # Check if missing
+        return None, None  # Return None values if AC data is unavailable
+
+    energy_savings_mwh = ac_total_energy_mwh - dc_total_energy_mwh
+    energy_savings_percentage = (energy_savings_mwh / ac_total_energy_mwh) * 100 if ac_total_energy_mwh != 0 else 0
+    return energy_savings_mwh, energy_savings_percentage
+
+
+def calculate_total_capex_difference(dc_total_capex_keur, ac_total_capex_keur):
+    """
+     Calculate the total CAPEX difference between the DC and AC grids.
+    Args:
+        dc_total_capex_keur: Total capital expenditure for the DC grid (k€).
+        ac_total_capex_keur: Total capital expenditure for the AC equivalent grid (k€).
+
+    Returns:
+        tuple: (absolute CAPEX difference in k€ - positive if AC is more expensive, negative if DC is more expensive,
+        percentage difference relative to AC CAPEX).
+
+    """
+    if ac_total_capex_keur is None or pd.isna(ac_total_capex_keur):  # Check if missing
+        return None, None  # Return None values if AC data is unavailable
+
+    capex_difference_keur = ac_total_capex_keur - dc_total_capex_keur
+    capex_difference_percentage = (capex_difference_keur / ac_total_capex_keur) * 100 if ac_total_capex_keur != 0 else 0
+    return capex_difference_keur, capex_difference_percentage

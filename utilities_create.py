@@ -68,7 +68,8 @@ def create_dc_network(path: str, path_cable_catalogue: str, path_converter_catal
     return net, cable_catalogue, use_case, node_data
 
 
-def _create_buses_and_components(net: pp.pandapowerNet, node_data: pd.DataFrame, converter_default, user_profile_data, default_assets_profile, use_case) -> None:
+def _create_buses_and_components(net: pp.pandapowerNet, node_data: pd.DataFrame, converter_default, user_profile_data,
+                                 default_assets_profile, use_case) -> None:
     """
     Creates buses and components (loads, storages, etc.) in the network.
 
@@ -312,7 +313,8 @@ def _fix_zero_voltages(subnetwork: pp.pandapowerNet) -> None:
         subnetwork.bus.loc[np.isclose(subnetwork.bus.vn_kv.values, 0), 'vn_kv'] = non_zero_voltage
 
 
-def _create_converters(net: pp.pandapowerNet, converter_data: pd.DataFrame, converter_default: pd.DataFrame, converter_catalogue: pd.DataFrame) -> None:
+def _create_converters(net: pp.pandapowerNet, converter_data: pd.DataFrame, converter_default: pd.DataFrame,
+                       converter_catalogue: pd.DataFrame) -> None:
     """
     Creates converters in the network based on the converter data.
 
@@ -348,7 +350,8 @@ def _create_converters(net: pp.pandapowerNet, converter_data: pd.DataFrame, conv
             _add_converter_from_catalogue(net, row, converter_catalogue, converter_default)
 
 
-def _add_converter(net: pp.pandapowerNet, row: pd.Series, converter_catalogue: pd.DataFrame, converter_default: pd.DataFrame) -> None:
+def _add_converter(net: pp.pandapowerNet, row: pd.Series, converter_catalogue: pd.DataFrame,
+                   converter_default: pd.DataFrame) -> None:
     """
     Adds a converter to the network based on the provided row data.
 
