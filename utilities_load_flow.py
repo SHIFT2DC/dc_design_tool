@@ -171,7 +171,8 @@ def add_load_to_upstream(up_net: pp.pandapowerNet, bus: int, adjusted_power: flo
             bus=bus,
             p_mw=adjusted_power,
             q_mvar=0,
-            name=f'Load of net {network_id}'
+            name=f'Load of net {network_id}',
+            scaling=np.sqrt(3)
         )
 
 
@@ -213,6 +214,7 @@ def process_subnetwork(network_id: int, network_dict: Dict, loadflowed_subs: Lis
 
     # Run power flow
     pp.runpp(tmp_net)
+    update_dc_results(tmp_net)
 
     # Adjust results if network contains 1 bus
     if len(tmp_net.bus) == 1:
@@ -467,6 +469,7 @@ def process_single_subnetwork_with_cable_sizing(dic_of_subs: Dict, n: int, cable
 
     # Run a power flow
     pp.runpp(tmp_net)
+    update_dc_results(tmp_net)
 
     # Adjust results if network contains 1 bus
     if len(tmp_net.bus) == 1:
@@ -681,6 +684,7 @@ def adjust_single_cable(subnet: pp.pandapowerNet, line_id: int, cable_catalogue:
         subnet.line.section.loc[line_id] = new_cable['section']
         try:
             pp.runpp(subnet)
+            update_dc_results(subnet)
         except:
             print("Load flow convergence issue.")
             load_flow_converge = False
@@ -694,6 +698,7 @@ def adjust_single_cable(subnet: pp.pandapowerNet, line_id: int, cable_catalogue:
         subnet.line.cable_rank.loc[line_id] = idx_cable
         subnet.line.section.loc[line_id] = new_cable['section']
     pp.runpp(subnet)
+    update_dc_results(subnet)
 
     # Check for downstream constraints
     return check_downstream_line_size(subnet, line_id, cable_catalogue)
@@ -721,6 +726,7 @@ def check_downstream_line_size(subnet: pp.pandapowerNet, line_id: int, cable_cat
             subnet.line.section.loc[downstream_line] = new_cable['section']
             optimal = False
     pp.runpp(subnet)
+    update_dc_results(subnet)
     return optimal
 
 
@@ -1175,3 +1181,43 @@ def interpolate_bess_p_droop(i, attr, net, droop_curve, t, duration, v_asset):
         soc_final = soc_init + soc_max_var
 
     return p_droop, soc_final
+
+
+def update_dc_results(net):
+    """Convert pandapower AC-equivalent results back to actual DC values."""
+
+    # Inverse scaling of power results (to get back DC values)
+    correction_factor = 1 / np.sqrt(3)
+
+    if "res_bus" in net and not net.res_bus.empty:
+        net.res_bus["p_mw"] *= correction_factor
+        net.res_bus["q_mvar"] *= correction_factor
+
+    if "res_line" in net and not net.res_line.empty:
+        net.res_line["p_from_mw"] *= correction_factor
+        net.res_line["q_from_mvar"] *= correction_factor
+        net.res_line["p_to_mw"] *= correction_factor
+        net.res_line["q_to_mvar"] *= correction_factor
+        net.res_line["pl_mw"] *= correction_factor**2
+        net.res_line["ql_mvar"] *= correction_factor**2
+
+    if "res_ext_grid" in net and not net.res_ext_grid.empty:
+        net.res_ext_grid["p_mw"] *= correction_factor
+        net.res_ext_grid["q_mvar"] *= correction_factor
+
+    if "res_load" in net and not net.res_load.empty:
+        net.res_load["p_mw"] *= correction_factor
+        net.res_load["q_mvar"] *= correction_factor
+
+    if "res_sgen" in net and not net.res_sgen.empty:
+        net.res_sgen["p_mw"] *= correction_factor
+        net.res_sgen["q_mvar"] *= correction_factor
+
+    if "res_storage" in net and not net.res_storage.empty:
+        net.res_storage["p_mw"] *= correction_factor
+        net.res_storage["q_mvar"] *= correction_factor
+
+    if "res_converter" in net and not net.res_converter.empty:
+        net.res_converter["p_mw"] *= correction_factor
+        net.res_converter["pl_mw"] *= correction_factor**2
+

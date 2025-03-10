@@ -204,8 +204,14 @@ def perform_comprehensive_sizing(network, cable_catalogue, use_case, node_data):
         pp.Network: Fully sized network model
     """
     # Scenario 1: Storage sizing
-    storage_network, battery_specs = calculate_storage_sizing_scenario(network, cable_catalogue, use_case, node_data)
-    apply_battery_specifications(network, battery_specs)
+    storage_network = None
+    # Check if storage converter sizing is required
+    storage_converter_mask = network.converter.loc[network.converter['type'] == 'Storage DC/DC Converter']
+    storage_sizing_not_needed = network.converter.loc[storage_converter_mask.index, "conv_rank"].isna().all()
+    if not storage_sizing_not_needed:  # Only perform storage sizing if required
+        storage_network, battery_specs = calculate_storage_sizing_scenario(network, cable_catalogue, use_case,
+                                                                           node_data)
+        apply_battery_specifications(network, battery_specs)
     
     # Scenario 2: Cable and converter sizing
     scenario2_network = create_scenario_network(
@@ -219,7 +225,11 @@ def perform_comprehensive_sizing(network, cable_catalogue, use_case, node_data):
         'Worst case scenario 3 for sizing cables and AC/DC converter', node_data)
     
     # Combine results from all scenarios
-    combined_network = merge_network_components(scenario2_network, storage_network)
+    if storage_network is not None:
+        combined_network = merge_network_components(scenario2_network, storage_network)
+    else:
+        combined_network = scenario2_network  # Skip storage merging if storage sizing was not performed
+
     final_network = merge_network_components(combined_network, scenario3_network)
     
     return final_network
@@ -237,9 +247,15 @@ def validate_network_performance(network, use_case, node_data):
     Returns:
         tuple: Networks from all test scenarios
     """
-    scenario1 = evaluate_scenario_performance(
-        network, use_case,
-        'Worst case scenario 1 for sizing of Storage DC/DC converter ', node_data)
+    # Check if storage converter sizing was required, to see if scenario 1 was launched or not
+    storage_converter_mask = network.converter.loc[network.converter['type'] == 'Storage DC/DC Converter']
+    storage_sizing_not_needed = network.converter.loc[storage_converter_mask.index, "conv_rank"].isna().all()
+    if not storage_sizing_not_needed:  # Only evaluate
+        scenario1 = evaluate_scenario_performance(
+            network, use_case,
+            'Worst case scenario 1 for sizing of Storage DC/DC converter ', node_data)
+    else:
+        scenario1 = None
     
     scenario2 = evaluate_scenario_performance(
         network, use_case,

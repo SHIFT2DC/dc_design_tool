@@ -40,8 +40,8 @@ scenario1, scenario2, scenario3 = validate_network_performance(net, use_case, no
 
 # Execute a load flow with droop control considering time-series data (user-defined or generated profiles)
 net_snapshots, results = perform_timestep_dc_load_flow(net, use_case, node_data)
-# Save load flow results 
-results.to_excel(os.path.join(output_dir,"output_timesteps_LF_results.xlsx"))
+# Save load flow results
+results.to_excel(os.path.join(output_dir, "output_timesteps_LF_results.xlsx"))
 
 ##########################################################
 # Calculate KPIs for DC grid
@@ -70,10 +70,9 @@ capex_difference_keur, capex_difference_percent = calculate_total_capex_differen
 
 # Save KPIs results
 save_kpis_results_to_excel(
-    os.path.join(output_dir,'output_kpis_results_file.xlsx'),
+    os.path.join(output_dir, 'output_kpis_results_file.xlsx'),
     (efficiency_ratio, total_consumed_energy_mwh, total_generated_energy_mwh, total_losses_cables_mwh,
      total_losses_converters_mwh, energy_savings_mwh, energy_savings_percent),
     (total_capex_keur, capex_details, capex_difference_keur, capex_difference_percent),
     (total_weight_kg, weight_details, total_lifecycle_emissions_kg_co2)
 )
-

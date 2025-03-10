@@ -97,7 +97,8 @@ def _create_buses_and_components(net: pp.pandapowerNet, node_data: pd.DataFrame,
                 name='load ' + str(bus),
                 bus=bus,
                 p_mw=row['Maximum power (kW)'] / 1000,  # Convert kW to MW
-                q_mvar=0
+                q_mvar=0,
+                scaling=np.sqrt(3)
             )
 
             if 'default' in row['Droop curve of asset']:
@@ -145,7 +146,8 @@ def _create_buses_and_components(net: pp.pandapowerNet, node_data: pd.DataFrame,
                 bus=bus,
                 p_mw=row['Maximum power (kW)'] / 1000,  # Convert kW to MW
                 max_e_mwh=row['Maximum power (kW)'] / 1000 * 4,  # Convert kWh to MWh
-                soc_percent=100  # Initial state of charge
+                soc_percent=100,  # Initial state of charge
+                scaling=np.sqrt(3)
             )
 
             if 'p_nom_mw' not in net.storage.columns:
@@ -188,7 +190,9 @@ def _create_buses_and_components(net: pp.pandapowerNet, node_data: pd.DataFrame,
                     bus=bus,
                     p_mw=row['Maximum power (kW)'] / 1000,  # Convert kW to MW
                     max_e_mwh=row['Capacity (kWh)'] / 1000,  # Convert kWh to MWh
-                    soc_percent=50  # Initial state of charge at 50%
+                    p_nom_mw=row['Maximum power (kW)'] / 1000,  # Convert kW to MW
+                    soc_percent=100,  # Initial state of charge at 50%
+                    scaling=np.sqrt(3)
                 )
             else:
                 pp.create_storage(
@@ -197,14 +201,16 @@ def _create_buses_and_components(net: pp.pandapowerNet, node_data: pd.DataFrame,
                     bus=bus,
                     p_mw=0,  # Convert kW to MW
                     max_e_mwh=0,  # Convert kWh to MWh
-                    soc_percent=50  # Initial state of charge at 50%
+                    soc_percent=50,  # Initial state of charge at 50%
+                    scaling=np.sqrt(3)
                 )
         elif component_type == 'pv':
             sgen = pp.create_sgen(
                 net,
                 bus=bus,
                 name=f'PV {bus}',
-                p_mw=row['Maximum power (kW)'] / 1000  # Active power in MW
+                p_mw=row['Maximum power (kW)'] / 1000,  # Active power in MW
+                scaling=np.sqrt(3)
             )
 
             if 'p_nom_mw' not in net.sgen.columns:
@@ -366,7 +372,7 @@ def _add_converter(net: pp.pandapowerNet, row: pd.Series, converter_catalogue: p
     for bus_key in ['from_bus', 'to_bus']:
         if row[bus_key] not in net.bus.index:
             voltage_key = 'V_i' if bus_key == 'from_bus' else 'V_j'
-            voltage = row[voltage_key] / 1000 if not np.isnan(row[voltage_key]) else 100 / 1000
+            voltage = row[voltage_key] / 1000 if not np.isnan(row[voltage_key]) else 0 / 1000
             pp.create_bus(
                 net,
                 index=row[bus_key],
@@ -436,7 +442,7 @@ def _add_converter_from_catalogue(net: pp.pandapowerNet, row: pd.Series, convert
     for bus_key in ['from_bus', 'to_bus']:
         if row[bus_key] not in net.bus.index:
             voltage_key = 'V_i' if bus_key == 'from_bus' else 'V_j'
-            voltage = row[voltage_key] / 1000 if not np.isnan(row[voltage_key]) else 100 / 1000
+            voltage = row[voltage_key] / 1000 if not np.isnan(row[voltage_key]) else 0 / 1000
             pp.create_bus(
                 net,
                 index=row[bus_key],

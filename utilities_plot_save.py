@@ -107,6 +107,7 @@ def plot_network_evaluation_results_with_plotly(net, node_data, file_name):
         cmax=100,
         infofunc=(Series(index=net.line.index,
                          data=[f'Line from {net.line.loc[i, "from_bus"]} bus to bus {net.line.loc[i, "to_bus"]} <br>'
+                               f'Length: {net.line.loc[i, "length_km"]*1000} m <br>'
                                f'Section: {net.line.loc[i, "section"]} mm² <br>'
                                f'Cable rank: {net.line.loc[i, "cable_rank"]} <br>'
                                f'Current: {row.i_ka * 1000:.1f} A <br>'
@@ -259,6 +260,7 @@ def plot_network_sizing_results_with_plotly(net, node_data, file_name):
         # cbar_title="Line section (mm²)",
         infofunc=(Series(index=net.line.index,
                          data=[f'Line from {net.line.loc[i, "from_bus"]} bus to bus {net.line.loc[i, "to_bus"]} <br>'
+                               f'Length: {net.line.loc[i, "length_km"]*1000} m <br>'
                                f'Section: {net.line.loc[i, "section"]} mm²'
                                for i, row in net.res_line.iterrows()]))
     )
