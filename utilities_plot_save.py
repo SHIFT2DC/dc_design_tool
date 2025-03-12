@@ -466,9 +466,9 @@ def plot_environmental_kpi(environmental_results):
 
 def save_kpis_results_to_excel(file_path, efficiency_results, economic_results, environmental_results):
     # Plot each KPI type
-    plot_efficiency_kpi(efficiency_results)
-    plot_economic_kpi(economic_results)
-    plot_environmental_kpi(environmental_results)
+    # plot_efficiency_kpi(efficiency_results)
+    # plot_economic_kpi(economic_results)
+    # plot_environmental_kpi(environmental_results)
 
     # Helper function to replace None with "Not Available"
     def safe_value(value):

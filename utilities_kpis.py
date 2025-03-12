@@ -6,7 +6,8 @@ import pandas as pd
 def calculate_efficiency_kpi(net_snapshots, timestep_hours):
 
     # Calculate efficiency ration of the network
-    efficiency_ratio, total_consumed_energy_mwh, total_generated_energy_mwh = calculate_efficiency_ratio(net_snapshots, timestep_hours)
+    efficiency_ratio, total_consumed_energy_mwh, total_generated_energy_mwh = calculate_efficiency_ratio(
+        net_snapshots, timestep_hours)
 
     # Calculate losses in cables and converters
     total_losses_cables_mwh, total_losses_converters_mwh = calculate_losses(net_snapshots, timestep_hours)
@@ -136,7 +137,8 @@ def calculate_investment_cost_converters(net, use_case, path_converter_catalogue
     return total_converter_cost_keur, capex_converters_keur_dict
 
 
-def calculate_investment_cost_cables(net, use_case, default_cost_cable_al_per_m=0.001, default_cost_cable_cu_per_m=0.002):
+def calculate_investment_cost_cables(net, use_case, default_cost_cable_al_per_m=0.001,
+                                     default_cost_cable_cu_per_m=0.002):
     """
     Calculate the total investment cost for cables in the network.
 
