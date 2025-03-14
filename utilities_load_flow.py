@@ -128,7 +128,8 @@ def add_upstream_ext_grids(network_dict: Dict, network_id: int, tmp_net: pp.pand
             tmp_net.ext_grid.loc[tmp_net.ext_grid['name'] == 'Converter emulation', 'vm_pu'] = v
 
 
-def update_upstream_network(network_dict: Dict, network_id: int, tmp_net: pp.pandapowerNet, net: pp.pandapowerNet) -> None:
+def update_upstream_network(network_dict: Dict, network_id: int, tmp_net: pp.pandapowerNet,
+                            net: pp.pandapowerNet) -> None:
     """
     Updates the upstream network with the results of the current subnetwork.
 
@@ -514,7 +515,8 @@ def add_upstream_ext_grids_for_sizing(dic_of_subs: Dict, n: int, tmp_net: pp.pan
         pp.create_ext_grid(tmp_net, bus=bus, vm_pu=1.0, name='Converter emulation')
 
 
-def update_upstream_networks_with_results(dic_of_subs: Dict, n: int, tmp_net: pp.pandapowerNet, net: pp.pandapowerNet) -> None:
+def update_upstream_networks_with_results(dic_of_subs: Dict, n: int, tmp_net: pp.pandapowerNet,
+                                          net: pp.pandapowerNet) -> None:
     """
     Updates the upstream networks with the results of the current subnetwork.
 
@@ -557,7 +559,8 @@ def adjust_converter_sizing(net: pp.pandapowerNet, AC_DC_factor: int, converter_
             update_converter_attributes(net, i, new_c, int(new_conv_rank))
 
 
-def select_converter_based_on_power(tmp_cc: pd.DataFrame, power_mw: float, AC_DC_factor: int, converter_factor: int) -> tuple:
+def select_converter_based_on_power(tmp_cc: pd.DataFrame, power_mw: float, AC_DC_factor: int,
+                                    converter_factor: int) -> tuple:
     """
     Selects the appropriate converter based on the power requirements.
 
@@ -896,7 +899,8 @@ def perform_timestep_dc_load_flow(net, use_case, node_data):
     return net_snapshots, results
 
  
-def perform_dc_load_flow_with_droop(net: pp.pandapowerNet, use_case: dict, t, time_step_duration, node_data) -> pp.pandapowerNet:
+def perform_dc_load_flow_with_droop(net: pp.pandapowerNet, use_case: dict, t, time_step_duration,
+                                    node_data) -> pp.pandapowerNet:
     """
     Performs DC load flow calculation on the network with iterative droop control adjustments.
 
@@ -914,7 +918,7 @@ def perform_dc_load_flow_with_droop(net: pp.pandapowerNet, use_case: dict, t, ti
     error = 1  # Initial error value
     nb_it = 0  # Iteration counter
     tol = 1e-2  # Tolerance for convergence
-    max_it = 3  # Maximum number of iterations
+    max_it = 2  # Maximum number of iterations
 
     # Perform initial DC load flow with droop control enabled
     net = perform_dc_load_flow(net, use_case, node_data, PDU_droop_control=True)
@@ -930,7 +934,7 @@ def perform_dc_load_flow_with_droop(net: pp.pandapowerNet, use_case: dict, t, ti
         bus_voltages_previous = bus_voltages
 
         # Apply droop correction based on the current time step
-        net, soc_list = droop_correction(net, t, time_step_duration)
+        net, soc_list = droop_correction(net, t, time_step_duration, node_data)
 
         # Perform DC load flow again with updated parameters
         net = perform_dc_load_flow(net, use_case, node_data, PDU_droop_control=True)
@@ -981,15 +985,16 @@ def compute_error(bus_voltages, bus_voltages_previous, net):
     max_deviation = max(voltage_deviation)
 
     # Debugging output (commented out but useful for analysis)
-    # print(pd.DataFrame(data=np.vstack((bus_voltages,bus_voltages_previous,voltage_deviation*100)).T,index=net.res_bus.index,columns=['v_bus','prev_v_bus','dev']))
-    # print('load  :' ,net.load['p_mw'])
-    # print('sgen  :' ,net.sgen['p_mw'])
+    print(pd.DataFrame(data=np.vstack((bus_voltages, bus_voltages_previous, voltage_deviation*100)).T,
+                       index=net.res_bus.index, columns=['v_bus', 'prev_v_bus', 'dev']))
+    print('load  :', net.load['p_mw'])
+    print('sgen  :', net.sgen['p_mw'])
     print('storage  :\n', net.storage['p_mw'])
 
     return max_deviation * 100  # Error in percentage
 
 
-def droop_correction(net, t, time_step_duration):
+def droop_correction(net, t, time_step_duration, node_data):
     """
     Adjusts the power setpoints of network elements (loads, generators, and storage)
     based on their droop control curves.
@@ -998,6 +1003,7 @@ def droop_correction(net, t, time_step_duration):
         net (pp.pandapowerNet): The network model being analyzed.
         t (int): Current time step index.
         time_step_duration (float): Duration of each time step in hours.
+        node_data
 
     Returns:
         tuple:
@@ -1010,10 +1016,10 @@ def droop_correction(net, t, time_step_duration):
         # Iterate over each element (row) in the corresponding dataframe (load, sgen, storage)
         for i, _ in getattr(net, attr).iterrows():
             # Get voltage of the bus where the element is connected
-            voltage_bus, v_asset = get_voltage_bus(i, attr, net)
+            voltage_bus, v_asset = get_voltage_bus(i, attr, net, node_data)
 
             # Retrieve the droop curve for the element
-            droop_curve = get_droop_curve(i, attr, net)
+            droop_curve = get_droop_curve(i, attr, net, node_data)
 
             # Special case for batteries in storage elements
             if (attr == 'storage') and ('Battery' in getattr(net, attr).loc[i, 'name']):
@@ -1030,7 +1036,7 @@ def droop_correction(net, t, time_step_duration):
     return net, soc_list
 
 
-def get_voltage_bus(i, attr, net):
+def get_voltage_bus(i, attr, net, node_data):
     """
     Retrieves the voltage of the bus to which a given network element (load, generator, or storage) is connected.
 
@@ -1041,6 +1047,7 @@ def get_voltage_bus(i, attr, net):
         i (int): Index of the network element.
         attr (str): Type of network element ('load', 'sgen', or 'storage').
         net (pp.pandapowerNet): The pandapower network model.
+        node_data
 
     Returns:
         tuple:
@@ -1051,11 +1058,11 @@ def get_voltage_bus(i, attr, net):
     asset_bus = getattr(net, attr).loc[i, 'bus']
     # Check if a converter is connected to this bus
     converter_connected = net.converter[(net.converter.from_bus == asset_bus) | (net.converter.to_bus == asset_bus)]
+    # Check if a converter is associated to this bus
+    converter_name_associated = node_data.loc[node_data['Node number'] == asset_bus, 'Directly linked converter '].values[0]
+    converter_associated = net.converter[net.converter['name'] == converter_name_associated]
 
-    if converter_connected.empty:
-        # If no converter is connected, use the asset's direct bus
-        voltage_bus = asset_bus
-    else:
+    if not converter_connected.empty:
         # If a converter is connected, retrieve its index
         converter_id = converter_connected.index[0]
         # Identify the bus on the opposite side of the converter
@@ -1064,13 +1071,22 @@ def get_voltage_bus(i, attr, net):
         else:
             voltage_bus = net.converter.loc[converter_id, 'from_bus']
 
+    elif not converter_associated.empty:
+        # If a converter is associated, retrieve its index
+        converter_id = converter_associated.index[0]
+        # Identify the bus on the opposite side of the converter
+        voltage_bus = net.converter.loc[converter_id, 'to_bus']
+    else:
+        # If no converter is connected, and no converter is associated, use the asset's direct bus
+        voltage_bus = asset_bus
+
     # Retrieve the voltage (per unit) at the determined bus
     v_asset = net.res_bus.loc[voltage_bus, 'vm_pu'].item()
 
     return voltage_bus, v_asset
 
 
-def get_droop_curve(i, attr, net):
+def get_droop_curve(i, attr, net, node_data):
     """
     Retrieves the droop curve for a given network element (load, generator, or storage).
 
@@ -1082,6 +1098,7 @@ def get_droop_curve(i, attr, net):
         i (int): Index of the network element.
         attr (str): Type of network element ('load', 'sgen', or 'storage').
         net (pp.pandapowerNet): The pandapower network model.
+        node_data
 
     Returns:
         np.ndarray: The droop curve of the element, either from the element itself or the associated converter.
@@ -1090,25 +1107,40 @@ def get_droop_curve(i, attr, net):
     asset_bus = getattr(net, attr).loc[i, 'bus']
     # Check if a converter is connected to this bus
     converter_connected = net.converter[(net.converter.from_bus == asset_bus) | (net.converter.to_bus == asset_bus)]
+    # Check if a converter is associated to this bus
+    converter_name_associated = node_data.loc[node_data['Node number'] == asset_bus, 'Directly linked converter '].values[0]
+    converter_associated = net.converter[net.converter['name'] == converter_name_associated]
 
-    if converter_connected.empty:
-        # If no converter is connected, check if the element has a defined droop curve
-        if np.isnan(net.load.loc[i, 'droop_curve']).any():
-            # Assign a default droop curve if none is provided
-            droop_curve = np.array([[1.5,1], [1.1,1], [1,1], [1,1], [0.99,1], [0.95,1]])
-        else:
-            # Use the droop curve defined in the load element
-            droop_curve = net.load.loc[i, 'droop_curve']
-    else:
+    if not converter_connected.empty:
         # If a converter is connected, retrieve its index
         converter_id = converter_connected.index[0]
         # Check if the converter has a defined droop curve
         if net.converter.loc[converter_id, 'droop_curve'] is None:
             # Assign a default droop curve if the converter has none
-            droop_curve = np.array([[1.5,1], [1.1,1], [1,1], [1,1], [0.99,1], [0.95,1]])
+            droop_curve = np.array([[1.5, 1], [1.1, 1], [1, 1], [1, 1], [0.99, 1], [0.95, 1]])
         else:
             # Use the droop curve defined in the converter
             droop_curve = net.converter.loc[converter_id, 'droop_curve']
+
+    elif not converter_associated.empty:
+        # If a converter is associated, retrieve its index
+        converter_id = converter_associated.index[0]
+        # Check if the converter has a defined droop curve
+        if net.converter.loc[converter_id, 'droop_curve'] is None:
+            # Assign a default droop curve if the converter has none
+            droop_curve = np.array([[1.5, 1], [1.1, 1], [1, 1], [1, 1], [0.99, 1], [0.95, 1]])
+        else:
+            # Use the droop curve defined in the converter
+            droop_curve = net.converter.loc[converter_id, 'droop_curve']
+
+    else:
+        # If no converter is connected, and no converter is associated, check if the element has a defined droop curve
+        if np.isnan(getattr(net, attr).loc[i, 'droop_curve']).any():
+            # Assign a default droop curve if none is provided
+            droop_curve = np.array([[1.5, 1], [1.1, 1], [1, 1], [1, 1], [0.99, 1], [0.95, 1]])
+        else:
+            # Use the droop curve defined in the load element
+            droop_curve = getattr(net, attr).loc[i, 'droop_curve']
 
     return droop_curve
 
@@ -1168,7 +1200,8 @@ def interpolate_bess_p_droop(i, attr, net, droop_curve, t, duration, v_asset):
     max_energy = getattr(net, attr).loc[i, 'max_e_mwh'].item()
 
     # SOC computation
-    soc_change = ((p_droop * duration) / max_energy) * 100  # SOC change (in %) Misses change 1 by period duration of each time step
+    soc_change = ((p_droop * duration) / max_energy) * 100  # SOC change (in %) Misses change 1 by period duration
+    # of each time step
     soc_final = soc_change + soc_init  # if is_positive else ini_SOC - SOC_change
 
     if soc_final <= 0:
@@ -1198,8 +1231,8 @@ def update_dc_results(net):
         net.res_line["q_from_mvar"] *= correction_factor
         net.res_line["p_to_mw"] *= correction_factor
         net.res_line["q_to_mvar"] *= correction_factor
-        net.res_line["pl_mw"] *= correction_factor**2
-        net.res_line["ql_mvar"] *= correction_factor**2
+        net.res_line["pl_mw"] *= 2*correction_factor**2
+        net.res_line["ql_mvar"] *= 2*correction_factor**2
 
     if "res_ext_grid" in net and not net.res_ext_grid.empty:
         net.res_ext_grid["p_mw"] *= correction_factor
@@ -1219,5 +1252,5 @@ def update_dc_results(net):
 
     if "res_converter" in net and not net.res_converter.empty:
         net.res_converter["p_mw"] *= correction_factor
-        net.res_converter["pl_mw"] *= correction_factor**2
+        net.res_converter["pl_mw"] *= 2*correction_factor**2
 

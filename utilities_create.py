@@ -4,7 +4,7 @@ from ast import literal_eval
 import numpy as np
 from utilities_read import read_uc_definition, read_cable_catalogue, process_cable_catalogue
 from utilities_net_topology import separate_subnetworks, sorting_network, merge_networks
-from utilities_load_profile import generate_load_profile
+from utilities_assets_profile import generate_load_profile
 
 
 def create_dc_network(path: str, path_cable_catalogue: str, path_converter_catalogue: str) -> tuple:
