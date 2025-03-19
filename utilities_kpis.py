@@ -129,6 +129,7 @@ def calculate_investment_cost_converters(net, use_case, path_converter_catalogue
                 converter_cost = matching_row['Approximate cost (kEUR)'].values[0]
 
         if converter_cost is None:  # If still not found, use the default cost
+            print(f"WARNING: Converter {converter_name} not found in catalogue. Using default cost.")
             converter_cost = nominal_power_kw * default_cost_per_kw
 
         capex_converters_keur_dict[converter_name] = converter_cost
@@ -173,6 +174,7 @@ def calculate_investment_cost_cables(net, use_case, default_cost_cable_al_per_m=
         capex_cables_keur_dict[cable_name] = cable_cost
         total_cable_cost_keur += cable_cost
 
+    print(f"INFO: Using default CAPEX costs for cables (based on cable type and length).")
     return total_cable_cost_keur, capex_cables_keur_dict
 
 
@@ -272,6 +274,8 @@ def calculate_maintenance_cost_converters(net, lifetime=20,
         maintenance_converters_keur_dict[converter_name] = converter_opex
         total_converter_opex_keur += converter_opex
 
+    print(f"INFO: Using default maintenance costs for converters (based on based on annual maintenance cost per kW "
+          f"and nominal power).")
     return total_converter_opex_keur, maintenance_converters_keur_dict
 
 
@@ -313,6 +317,8 @@ def calculate_maintenance_cost_cables(net, use_case, lifetime=20,
         maintenance_cables_keur_dict[cable_name] = cable_opex
         total_cable_opex_keur += cable_opex
 
+    print(f"INFO: Using default maintenance costs for cables (based on based on annual maintenance cost per meter "
+          f"and cable length).")
     return total_cable_opex_keur, maintenance_cables_keur_dict
 
 
@@ -384,6 +390,7 @@ def calculate_weight_converters(net, use_case, path_converter_catalogue, default
                 matching_row = tmp_catalogue.loc[tmp_catalogue['Nominal power (kW)'] == nominal_power_kw]
                 if not matching_row.empty:
                     converter_weight = matching_row['Weight (kg)'].values[0]
+                    print(f"INFO: Converter {converter_name} found in catalogue. Using default weight.")
 
         if converter_weight is None:  # If not found, search in the global converter catalogue
             matching_row = converter_catalogue[
@@ -392,6 +399,7 @@ def calculate_weight_converters(net, use_case, path_converter_catalogue, default
                     ]
             if not matching_row.empty:
                 converter_weight = matching_row['Weight (kg)'].values[0]
+                print(f"INFO: Converter {converter_name} found in catalogue. Using default weight.")
 
         if converter_weight is None:  # If still not found, use the default cost
             print(f"WARNING: Converter {converter_name} not found in catalogue. Using default weight.")
@@ -439,6 +447,7 @@ def calculate_weight_cables(net, use_case, default_weight_cable_al_per_m=1, defa
         weight_cables_kg_dict[cable_name] = cable_weight
         total_weight_cable_kg += cable_weight
 
+    print(f"INFO: Using default weights for cables (based on cable type and length).")
     return total_weight_cable_kg, weight_cables_kg_dict
 
 
@@ -484,6 +493,7 @@ def calculate_lifecycle_emissions_kpi(
     # --- Compute lifecycle emissions ---
     total_emissions_converter_kg_co2 = total_weight_converter_kg * emission_factor_converter_kg_co2_per_kg
     total_emissions_cable_kg_co2 = total_weight_cable_kg * emission_factor_cable_kg_co2_per_kg
+    print(f"INFO: Using default CO2 emission factors per kg for cables and converters.")
 
     total_lifecycle_emissions_kg_co2 = total_emissions_converter_kg_co2 + total_emissions_cable_kg_co2
 
@@ -503,6 +513,7 @@ def calculate_energy_savings(dc_total_energy_mwh, ac_total_energy_mwh):
 
     """
     if ac_total_energy_mwh is None or pd.isna(ac_total_energy_mwh):  # Check if missing
+        print(f"WARNING: AC total energy produced not found in input file. Energy savings KPI will not calculated.")
         return None, None  # Return None values if AC data is unavailable
 
     energy_savings_mwh = ac_total_energy_mwh - dc_total_energy_mwh
@@ -523,6 +534,7 @@ def calculate_total_capex_difference(dc_total_capex_keur, ac_total_capex_keur):
 
     """
     if ac_total_capex_keur is None or pd.isna(ac_total_capex_keur):  # Check if missing
+        print(f"WARNING: AC total CAPEX not found in input file. Capex difference KPI will not calculated.")
         return None, None  # Return None values if AC data is unavailable
 
     capex_difference_keur = ac_total_capex_keur - dc_total_capex_keur

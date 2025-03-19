@@ -550,4 +550,11 @@ def save_kpis_results_to_excel(file_path, efficiency_results, economic_results, 
     print(f"KPIs have been saved to {file_path}")
 
 
+def save_timestep_load_flow_results_to_excel(results, file_name):
+    results.to_excel(file_name)
+    print(f"Time step load flow results saved to {file_name}")
+
+
+
+
 

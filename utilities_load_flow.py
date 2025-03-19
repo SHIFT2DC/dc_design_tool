@@ -764,14 +764,16 @@ def check_high_voltage_nodes(net, voltage_threshold=1.1):
         # Raise warning if no generator connection
         if not sgen_connected:
             bus_voltage = net.res_bus.at[bus, 'vm_pu']
-            warnings.warn(
+            '''warnings.warn(
                 "******WARNING******\n"
                 f"High voltage alert! Bus {bus} (voltage = {bus_voltage:.3f} pu)\n "
                 f"has no static generator connection through transformers.\n"
                 "******WARNING******\n",
                 category=UserWarning,
                 stacklevel=2
-            )
+            )'''
+            print(f"WARNING:High voltage alert! Bus {bus} (voltage = {bus_voltage:.3f} pu) has no static generator "
+                  f"connection through transformers. ")
 
 
 def update_network(net, t):
@@ -959,8 +961,8 @@ def perform_dc_load_flow_with_droop(net: pp.pandapowerNet, use_case: dict, t, ti
     for i, _ in net.storage.iterrows():
         if 'Battery' in net.storage.loc[i, 'name']:  # Check if the storage unit is a battery
             soc = soc_list[c]  # Retrieve the corresponding SOC value
-            print(soc_list)  # Debugging: Print SOC list
-            print(soc)  # Debugging: Print individual SOC value
+            # print(soc_list)  # Debugging: Print SOC list
+            # print(soc)  # Debugging: Print individual SOC value
             net.storage.loc[i, 'soc_percent'] = soc  # Update SOC in the network model
             c += 1  # Move to the next SOC value in the list
         
@@ -985,11 +987,11 @@ def compute_error(bus_voltages, bus_voltages_previous, net):
     max_deviation = max(voltage_deviation)
 
     # Debugging output (commented out but useful for analysis)
-    print(pd.DataFrame(data=np.vstack((bus_voltages, bus_voltages_previous, voltage_deviation*100)).T,
+    '''print(pd.DataFrame(data=np.vstack((bus_voltages, bus_voltages_previous, voltage_deviation*100)).T,
                        index=net.res_bus.index, columns=['v_bus', 'prev_v_bus', 'dev']))
     print('load  :', net.load['p_mw'])
     print('sgen  :', net.sgen['p_mw'])
-    print('storage  :\n', net.storage['p_mw'])
+    print('storage  :\n', net.storage['p_mw'])'''
 
     return max_deviation * 100  # Error in percentage
 

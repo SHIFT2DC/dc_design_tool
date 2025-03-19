@@ -269,9 +269,9 @@ if __name__ == "__main__":
     )
     
     # Affichage des 10 premiers éléments pour vérification
-    print("Timestamps:", timestamps[:10])
+    '''print("Timestamps:", timestamps[:10])
     print("Load Values:", load[:10])
-    print("Timestamp Indices:", indices[:10])
+    print("Timestamp Indices:", indices[:10])'''
     
     # Affichage du profil généré
     import matplotlib.pyplot as plt
