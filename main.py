@@ -15,7 +15,7 @@ import os
 
 ##########################################################
 # Insert the path of the input file
-# path = 'input_file_grid_data.xlsx'
+path = 'input_file_grid_data.xlsx'
 # path = 'input_file_grid_data_building.xlsx'
 # path = 'input_file_grid_data_port.xlsx'
 # path = 'input_file_grid_data_datacenter.xlsx'
