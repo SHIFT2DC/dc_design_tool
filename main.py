@@ -7,6 +7,7 @@ from utilities_load_flow import (perform_dc_load_flow, perform_load_flow_with_si
                                  perform_timestep_dc_load_flow)
 from utilities_worst_case_sizing import perform_comprehensive_sizing, validate_network_performance
 from utilities_kpis import (calculate_efficiency_kpi, calculate_total_investment_cost_cables_converters_kpi,
+                            calculate_total_maintenance_cost_cables_converters_kpi,
                             calculate_total_weight_cables_converters_kpi, calculate_lifecycle_emissions_kpi,
                             calculate_energy_savings, calculate_total_capex_difference)
 
@@ -14,10 +15,13 @@ import os
 
 ##########################################################
 # Insert the path of the input file
-path = 'input_file_grid_data.xlsx'
+# path = 'input_file_grid_data.xlsx'
+# path = 'input_file_grid_data_building.xlsx'
+# path = 'input_file_grid_data_port.xlsx'
+# path = 'input_file_grid_data_datacenter.xlsx'
 # Insert the path of the catalogues
-path_cable_catalogue = "catalogue_cable.xlsx"
-path_converter_catalogue = "catalogue_converter.xlsx"
+path_cable_catalogue = "catalog_cable.xlsx"
+path_converter_catalogue = "catalog_converter.xlsx"
 
 # Define the output directory
 output_dir = "output"
@@ -52,6 +56,7 @@ timestep_hours = use_case['Parameters for annual simulations']['Simulation time 
 # Economic
 total_capex_keur, capex_details = calculate_total_investment_cost_cables_converters_kpi(net, use_case,
                                                                                         path_converter_catalogue)
+total_opex_keur, opex_details = calculate_total_maintenance_cost_cables_converters_kpi(net, use_case)
 # Environmental
 total_weight_kg, weight_details = calculate_total_weight_cables_converters_kpi(net, use_case, path_converter_catalogue)
 total_lifecycle_emissions_kg_co2 = calculate_lifecycle_emissions_kpi(net, use_case, path_converter_catalogue)
@@ -73,6 +78,6 @@ save_kpis_results_to_excel(
     os.path.join(output_dir, 'output_kpis_results_file.xlsx'),
     (efficiency_ratio, total_consumed_energy_mwh, total_generated_energy_mwh, total_losses_cables_mwh,
      total_losses_converters_mwh, energy_savings_mwh, energy_savings_percent),
-    (total_capex_keur, capex_details, capex_difference_keur, capex_difference_percent),
+    (total_capex_keur, capex_details, capex_difference_keur, capex_difference_percent, total_opex_keur, opex_details),
     (total_weight_kg, weight_details, total_lifecycle_emissions_kg_co2)
 )

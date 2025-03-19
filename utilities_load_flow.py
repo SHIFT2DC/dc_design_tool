@@ -918,7 +918,7 @@ def perform_dc_load_flow_with_droop(net: pp.pandapowerNet, use_case: dict, t, ti
     error = 1  # Initial error value
     nb_it = 0  # Iteration counter
     tol = 1e-2  # Tolerance for convergence
-    max_it = 2  # Maximum number of iterations
+    max_it = 3  # Maximum number of iterations
 
     # Perform initial DC load flow with droop control enabled
     net = perform_dc_load_flow(net, use_case, node_data, PDU_droop_control=True)

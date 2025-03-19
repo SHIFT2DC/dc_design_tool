@@ -505,12 +505,16 @@ def save_kpis_results_to_excel(file_path, efficiency_results, economic_results, 
 
     # Economic KPI results - split Capex Details into separate columns
     capex_details = economic_results[1]
+    opex_details = economic_results[5]
     economic_df = pd.DataFrame({
         'Total CAPEX (KEUR)': [economic_results[0]],
         capex_difference_label_keur: [safe_value(economic_results[2])],
         capex_difference_label_percent: [safe_value(economic_results[3])],
         'Converters CAPEX (KEUR)': [capex_details['Converters CAPEX (kEUR)']],
-        'Cables CAPEX (KEUR)': [capex_details['Cables CAPEX (kEUR)']]
+        'Cables CAPEX (KEUR)': [capex_details['Cables CAPEX (kEUR)']],
+        'Total OPEX (KEUR)': [economic_results[4]],
+        'Converters OPEX (KEUR)': [opex_details['Converters OPEX (kEUR)']],
+        'Cables OPEX (KEUR)': [opex_details['Cables OPEX (kEUR)']],
     })
 
     # Add individual converter details (each converter in a separate column)

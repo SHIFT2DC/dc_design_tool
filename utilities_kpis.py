@@ -176,6 +176,146 @@ def calculate_investment_cost_cables(net, use_case, default_cost_cable_al_per_m=
     return total_cable_cost_keur, capex_cables_keur_dict
 
 
+def calculate_total_maintenance_cost_cables_converters_kpi(net, use_case, lifetime=20,
+                         default_cost_PV_converter=0.05,
+                         default_cost_EV_converter=0.07,
+                         default_cost_ACDC_converter=0.06,
+                         default_cost_DCAC_converter=0.06,
+                         default_cost_storage_converter=0.08,
+                         default_cost_cable_al_per_m=0.00002,
+                         default_cost_cable_cu_per_m=0.00003):
+    """
+    Calculate the total OPEX (maintenance costs) for the DC network.
+
+    Parameters:
+        net (pandapowerNet): The DC network model.
+        use_case
+        lifetime (int): The assumed operational lifetime in years (default: 20).
+        Other parameters: Annual maintenance costs for converters and cables.
+
+    Returns:
+        total_opex_keur (float): Total operational expenditure in kEUR.
+        opex_details (dict): Breakdown of OPEX costs.
+    """
+    # Compute Converter OPEX
+    total_converter_opex_keur, maintenance_converters_keur_dict = calculate_maintenance_cost_converters(
+        net, lifetime, default_cost_PV_converter, default_cost_EV_converter,
+        default_cost_ACDC_converter, default_cost_DCAC_converter, default_cost_storage_converter
+    )
+
+    # Compute Cable OPEX
+    total_cable_opex_keur, maintenance_cables_keur_dict = calculate_maintenance_cost_cables(
+        net, use_case, lifetime, default_cost_cable_al_per_m, default_cost_cable_cu_per_m
+    )
+
+    # Compute Total OPEX
+    total_opex_keur = total_converter_opex_keur + total_cable_opex_keur
+
+    opex_details = {
+        "Total OPEX (kEUR)": total_opex_keur,
+        "Converters OPEX (kEUR)": total_converter_opex_keur,
+        "Cables OPEX (kEUR)": total_cable_opex_keur,
+        "Details": {
+            "Converters": maintenance_converters_keur_dict,
+            "Cables": maintenance_cables_keur_dict
+        }
+    }
+
+    return total_opex_keur, opex_details
+
+
+def calculate_maintenance_cost_converters(net, lifetime=20,
+                                          default_cost_PV_converter=0.05,
+                                          default_cost_EV_converter=0.07,
+                                          default_cost_ACDC_converter=0.06,
+                                          default_cost_DCAC_converter=0.06,
+                                          default_cost_storage_converter=0.08):
+    """
+    Calculate the total maintenance cost for converters over the given lifetime.
+
+    Parameters:
+        net (pandapowerNet): The DC network model.
+        lifetime (int): The assumed operational lifetime in years (default: 20).
+        default_cost_PV_converter (float): Annual maintenance cost per kW in kEUR/kW for PV converters.
+        default_cost_EV_converter (float): Annual maintenance cost per kW in kEUR/kW for EV converters.
+        default_cost_ACDC_converter (float): Annual maintenance cost per kW in kEUR/kW for AC/DC converters.
+        default_cost_DCAC_converter (float): Annual maintenance cost per kW in kEUR/kW for DC/AC converters.
+        default_cost_storage_converter (float): Annual maintenance cost per kW in kEUR/kW for storage converters.
+
+    Returns:
+        total_converter_opex_keur (float): Total maintenance cost in kEUR.
+        maintenance_converters_keur_dict (dict): Dictionary storing OPEX for each converter.
+    """
+    total_converter_opex_keur = 0
+    maintenance_converters_keur_dict = {}
+
+    for index, row in net.converter.iterrows():
+        converter_name = row["name"]
+        nominal_power_kw = row["P"] * 1000  # Convert MW to kW
+        converter_type = row["type"]
+
+        # Assign maintenance cost per kW based on converter type
+        if "PV" in converter_type:
+            annual_cost_per_kw = default_cost_PV_converter
+        elif "EV" in converter_type:
+            annual_cost_per_kw = default_cost_EV_converter
+        elif "AC/DC" in converter_type:
+            annual_cost_per_kw = default_cost_ACDC_converter
+        elif "DC/AC" in converter_type:
+            annual_cost_per_kw = default_cost_DCAC_converter
+        elif "Storage" in converter_type:
+            annual_cost_per_kw = default_cost_storage_converter
+        else:
+            annual_cost_per_kw = 0.06  # Default cost if type is unknown
+
+        converter_opex = nominal_power_kw * annual_cost_per_kw * lifetime  # Total cost over lifetime
+        maintenance_converters_keur_dict[converter_name] = converter_opex
+        total_converter_opex_keur += converter_opex
+
+    return total_converter_opex_keur, maintenance_converters_keur_dict
+
+
+def calculate_maintenance_cost_cables(net, use_case, lifetime=20,
+                                      default_cost_cable_al_per_m=0.00002,
+                                      default_cost_cable_cu_per_m=0.00003):
+    """
+    Calculate the total maintenance cost for cables over the given lifetime.
+
+    Parameters:
+        net (pandapowerNet): The DC network model.
+        use_case
+        lifetime (int): The assumed operational lifetime in years (default: 20).
+        default_cost_cable_al_per_m (float): Annual maintenance cost per meter for aluminum cables in kEUR/m.
+        default_cost_cable_cu_per_m (float): Annual maintenance cost per meter for copper cables in kEUR/m.
+
+    Returns:
+        total_cable_opex_keur (float): Total maintenance cost for cables in kEUR.
+        maintenance_cables_keur_dict (dict): Dictionary storing OPEX for each cable.
+    """
+    total_cable_opex_keur = 0
+    maintenance_cables_keur_dict = {}
+
+    cable_info = use_case['Conductor parameters']
+    cable_type = cable_info['Material ']  # Default to Aluminum if type is not specified
+
+    for index, row in net.line.iterrows():
+        cable_name = f"line {row['from_bus']} - {row['to_bus']}"
+        cable_length_m = row["length_km"] * 1000
+
+        # Determine cost per meter based on material type
+        if "Copper" in cable_type:
+            cost_per_m = default_cost_cable_cu_per_m
+        else:
+            cost_per_m = default_cost_cable_al_per_m
+
+        # Calculate total maintenance cost over lifetime
+        cable_opex = cable_length_m * cost_per_m * lifetime
+        maintenance_cables_keur_dict[cable_name] = cable_opex
+        total_cable_opex_keur += cable_opex
+
+    return total_cable_opex_keur, maintenance_cables_keur_dict
+
+
 def calculate_total_weight_cables_converters_kpi(net, use_case, path_converter_catalogue,
                                                  default_weight_converter_kg_per_kw=1,
                                                  default_weight_cable_al_per_m=1,
