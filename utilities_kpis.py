@@ -540,3 +540,48 @@ def calculate_total_capex_difference(dc_total_capex_keur, ac_total_capex_keur):
     capex_difference_keur = ac_total_capex_keur - dc_total_capex_keur
     capex_difference_percentage = (capex_difference_keur / ac_total_capex_keur) * 100 if ac_total_capex_keur != 0 else 0
     return capex_difference_keur, capex_difference_percentage
+
+
+def calculate_total_weight_difference(dc_total_weight_kg, ac_total_weight_kg):
+    """
+     Calculate the total weight difference between the DC and AC grids.
+    Args:
+        dc_total_weight_kg: Total weight for the DC grid (kg).
+        ac_total_weight_kg: Total weight for the AC equivalent grid (kg).
+
+    Returns:
+        tuple: (absolute weight difference in kg - positive if AC weight is bigger, negative if DC weight is bigger,
+        percentage difference relative to AC weight).
+
+    """
+    if ac_total_weight_kg is None or pd.isna(ac_total_weight_kg):  # Check if missing
+        print(f"WARNING: AC total weight not found in input file. Weight difference KPI will not calculated.")
+        return None, None  # Return None values if AC data is unavailable
+
+    weight_difference_kg = ac_total_weight_kg - dc_total_weight_kg
+    weight_difference_percentage = (weight_difference_kg / ac_total_weight_kg) * 100 if ac_total_weight_kg != 0 else 0
+    return weight_difference_kg, weight_difference_percentage
+
+
+def calculate_total_lifecycle_emissions_difference(dc_total_lifecycle_emissions_kg_co2,
+                                                   ac_total_lifecycle_emissions_kg_co2):
+    """
+     Calculate the total emissions difference between the DC and AC grids.
+    Args:
+        dc_total_lifecycle_emissions_kg_co2: Total emissions for the DC grid (kg).
+        ac_total_lifecycle_emissions_kg_co2: Total emissions for the AC equivalent grid (kg).
+
+    Returns:
+        tuple: (absolute emissions difference in kg CO2 - positive if AC emissions is bigger, negative if DC emissions
+         is bigger, percentage difference relative to AC emissions).
+
+    """
+    if ac_total_lifecycle_emissions_kg_co2 is None or pd.isna(ac_total_lifecycle_emissions_kg_co2):  # Check if missing
+        print(f"WARNING: AC total emissions not found in input file. Weight difference KPI will not calculated.")
+        return None, None  # Return None values if AC data is unavailable
+
+    lifecycle_emissions_difference_kg_co2 = ac_total_lifecycle_emissions_kg_co2 - dc_total_lifecycle_emissions_kg_co2
+    lifecycle_emissions_difference_percentage = (
+            (lifecycle_emissions_difference_kg_co2 / ac_total_lifecycle_emissions_kg_co2) * 100) \
+        if ac_total_lifecycle_emissions_kg_co2 != 0 else 0
+    return lifecycle_emissions_difference_kg_co2, lifecycle_emissions_difference_percentage

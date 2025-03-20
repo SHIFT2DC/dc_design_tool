@@ -525,11 +525,32 @@ def save_kpis_results_to_excel(file_path, efficiency_results, economic_results, 
     for cable_line, cost in capex_details['Details']['Cables'].items():
         economic_df[f'Cable {cable_line} CAPEX (KEUR)'] = [cost]
 
+    # Determine the correct label for weight difference
+    weight_difference_kg = environmental_results[3]
+    if weight_difference_kg is not None:
+        weight_difference_label_kg = 'Weight Savings (AC heavier) (kg)' if weight_difference_kg >= 0 else 'Extra Weight (DC heavier) (kg)'
+        weight_difference_label_percent = 'Weight Savings (AC heavier) (%)' if weight_difference_kg >= 0 else 'Extra Weight (DC heavier) (%)'
+    else:
+        weight_difference_label_kg = 'Weight Savings / Extra Weight (kg)'
+        weight_difference_label_percent = 'Weight Savings / Extra Weight (%)'
+
+    lifecycle_emissions_difference_kg_co2 = environmental_results[5]
+    if lifecycle_emissions_difference_kg_co2 is not None:
+        emissions_difference_label_kg_co2 = 'CO2 Emissions Savings (AC more emissions) (kg CO2)' if lifecycle_emissions_difference_kg_co2 >= 0 else 'Extra CO2 Emissions (DC more emissions) (kg CO2)'
+        emissions_difference_label_percent = 'CO2 Emissions Savings (AC more emissions) (%)' if lifecycle_emissions_difference_kg_co2 >= 0 else 'Extra CO2 Emissions (DC more emissions) (%)'
+    else:
+        emissions_difference_label_kg_co2 = 'CO2 Emissions Savings / Extra CO2 Emissions (kg CO2)'
+        emissions_difference_label_percent = 'CO2 Emissions Savings / Extra CO2 Emissions (%)'
+
     # Environmental KPI results - split Weight Details into separate columns
     weight_details = environmental_results[1]
     environmental_df = pd.DataFrame({
         'Total Weight (kg)': [environmental_results[0]],
-        'Total Lifecycle Emissions (kg CO2)': [environmental_results[2]]
+        'Total Lifecycle Emissions (kg CO2)': [environmental_results[2]],
+        weight_difference_label_kg: [safe_value(environmental_results[3])],
+        weight_difference_label_percent: [safe_value(environmental_results[4])],
+        emissions_difference_label_kg_co2: [safe_value(environmental_results[5])],
+        emissions_difference_label_percent: [safe_value(environmental_results[6])],
     })
 
     # Add individual converter details (each converter in a separate column)

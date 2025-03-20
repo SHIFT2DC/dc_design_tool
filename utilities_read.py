@@ -36,7 +36,7 @@ def read_uc_definition(xl_file):
     uc_definition['Parameters for annual simulations'] = {df.iloc[i_start+i].param: df.iloc[i_start+i].val for i in range(2)}
 
     i_start = list(df.loc[df['param'] == 'Parameters of equivalent AC grid for KPIs comparison'].index)[0]+1
-    uc_definition['Parameters of equivalent AC grid for KPIs comparison'] = {df.iloc[i_start + i].param: df.iloc[i_start + i].val for i in range(3)}
+    uc_definition['Parameters of equivalent AC grid for KPIs comparison'] = {df.iloc[i_start + i].param: df.iloc[i_start + i].val for i in range(5)}
     return uc_definition
 
 

@@ -10,7 +10,8 @@ from utilities_worst_case_sizing import perform_comprehensive_sizing, validate_n
 from utilities_kpis import (calculate_efficiency_kpi, calculate_total_investment_cost_cables_converters_kpi,
                             calculate_total_maintenance_cost_cables_converters_kpi,
                             calculate_total_weight_cables_converters_kpi, calculate_lifecycle_emissions_kpi,
-                            calculate_energy_savings, calculate_total_capex_difference)
+                            calculate_energy_savings, calculate_total_capex_difference,
+                            calculate_total_weight_difference, calculate_total_lifecycle_emissions_difference)
 
 import os
 
@@ -75,6 +76,8 @@ ac_total_generated_energy_mwh = (
     use_case)['Parameters of equivalent AC grid for KPIs comparison']['Total energy generated in AC grid (MWh)']
 ac_efficiency_ratio = use_case['Parameters of equivalent AC grid for KPIs comparison']['Efficiency of AC grid (%)']
 ac_total_capex_keur = use_case['Parameters of equivalent AC grid for KPIs comparison']['Total CAPEX of AC grid (kEUR)']
+ac_total_weight_kg = use_case['Parameters of equivalent AC grid for KPIs comparison']['Total weight of AC grid (kg)']
+ac_total_lifecycle_emissions_kg_co2 = use_case['Parameters of equivalent AC grid for KPIs comparison']['Total CO2 emissions of AC grid (kg CO2)']
 
 print(f"*Computing Comparison KPIs between DC and DC grids.*")
 # Compare KPIs for AC grid and DC grid
@@ -82,6 +85,12 @@ energy_savings_mwh, energy_savings_percent = calculate_energy_savings(total_gene
                                                                       ac_total_generated_energy_mwh)
 capex_difference_keur, capex_difference_percent = calculate_total_capex_difference(total_capex_keur,
                                                                                    ac_total_capex_keur)
+weight_difference_kg, weight_difference_percentage = calculate_total_weight_difference(total_weight_kg,
+                                                                                       ac_total_weight_kg)
+lifecycle_emissions_difference_kg_co2, lifecycle_emissions_difference_percentage = (
+    calculate_total_lifecycle_emissions_difference(total_lifecycle_emissions_kg_co2,
+                                                   ac_total_lifecycle_emissions_kg_co2)
+)
 
 # Save KPIs results
 save_kpis_results_to_excel(
@@ -89,5 +98,6 @@ save_kpis_results_to_excel(
     (efficiency_ratio, total_consumed_energy_mwh, total_generated_energy_mwh, total_losses_cables_mwh,
      total_losses_converters_mwh, energy_savings_mwh, energy_savings_percent),
     (total_capex_keur, capex_details, capex_difference_keur, capex_difference_percent, total_opex_keur, opex_details),
-    (total_weight_kg, weight_details, total_lifecycle_emissions_kg_co2)
+    (total_weight_kg, weight_details, total_lifecycle_emissions_kg_co2, weight_difference_kg,
+     weight_difference_percentage, lifecycle_emissions_difference_kg_co2, lifecycle_emissions_difference_percentage)
 )

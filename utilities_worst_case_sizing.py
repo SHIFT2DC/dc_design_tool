@@ -221,6 +221,9 @@ def perform_comprehensive_sizing(network, cable_catalogue, use_case, node_data):
         storage_network, battery_specs = calculate_storage_sizing_scenario(network, cable_catalogue, use_case,
                                                                            node_data)
         apply_battery_specifications(network, battery_specs)
+    else:
+        print(f"WARNING: Storage is sized by the user. Worst case scenario 1 will not be used for sizing. "
+              f"Load flow will not be performed.")
     
     # Scenario 2: Cable and converter sizing
     scenario2_network = create_scenario_network(
